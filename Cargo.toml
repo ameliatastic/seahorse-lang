@@ -1,10 +1,10 @@
 [package]
 name = "seahorse-lang"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "Write Anchor-compatible Solana programs in Python"
-homepage = "https://docs.seahorse-lang.org/"
+homepage = "https://seahorse-lang.org/"
 repository = "https://github.com/ameliatastic/seahorse-lang/"
 readme = "README.md"
 
