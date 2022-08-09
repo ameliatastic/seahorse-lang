@@ -583,6 +583,35 @@ impl ToTokens for Expression {
 
                 quote! { #name }
             }
+            Expression::SolTransfer { from, to, amount, pda } => {
+                if *pda {
+                    quote! {
+                        {
+                            let amount = #amount;
+                            **#from.to_account_info().try_borrow_mut_lamports()? -= amount;
+                            **#to.to_account_info().try_borrow_mut_lamports()? += amount;
+                        }
+                    }
+                } else {
+                    let from_key = from.clone().with_call("key", vec![]);
+                    let to_key = to.clone().with_call("key", vec![]);
+
+                    quote! {
+                        solana_program::program::invoke(
+                            &solana_program::system_instruction::transfer(
+                                &#from_key,
+                                &#to_key,
+                                #amount
+                            ),
+                            &[
+                                (#from).to_account_info(),
+                                (#to).to_account_info(),
+                                ctx.accounts.system_program.to_account_info()
+                            ]
+                        )
+                    }
+                }
+            }
             Expression::CpiCall { cpi, signer } => {
                 let (program, accounts) = match &**cpi {
                     Cpi::TokenTransfer {
@@ -792,6 +821,7 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
     tokens.extend(quote! {
         use anchor_lang::prelude::*;
         use anchor_spl::token;
+        use anchor_lang::solana_program;
         use std::convert::TryFrom;
 
         declare_id!(#id);

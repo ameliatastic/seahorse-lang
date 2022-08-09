@@ -327,6 +327,7 @@ impl TransformPass {
                     panic!("Encountered an unknown initializer?");
                 }
             }
+            Expression::SolTransfer { ..} => Ty::Unit,
             Expression::CpiCall { .. } => Ty::Unit,
             Expression::GetBump { .. } => Ty::U8,
             Expression::FString { .. } => Ty::String,
@@ -1650,6 +1651,31 @@ impl TransformPass {
                         self.context.infer_system_program = true;
 
                         Ok(Expression::Initialized { name })
+                    }
+                    (ty, "transfer_lamports") if self.is_account_type(&ty) => {
+                        let mut args = self.transform_call_args(
+                            args,
+                            &vec![
+                                Param::new("to", Ty::Any),
+                                Param::new("amount", Ty::U64)
+                            ],
+                        )?;
+                        let mut arg = move |name: &str| args.remove(name);
+
+                        let to = arg("to").unwrap();
+                        let amount = arg("amount").unwrap();
+
+                        self.context.infer_system_program = true;
+
+                        Ok(Expression::SolTransfer {
+                            from: value,
+                            to: Box::new(to),
+                            amount: Box::new(amount),
+                            pda: match ty {
+                                Ty::ExactDefined { is_acc, ..} => is_acc,
+                                _ => false
+                            }
+                        })
                     }
                     (Ty::ExactDefined { name, .. }, attr) if self.ty_defs.contains_key(&name) => {
                         if let Some((params, ..)) = self

@@ -282,6 +282,12 @@ pub enum Expression {
     Initialized {
         name: String,
     },
+    SolTransfer {
+        from: Box<Expression>,
+        to: Box<Expression>,
+        amount: Box<Expression>,
+        pda: bool
+    },
     CpiCall {
         cpi: Box<Cpi>,
         signer: Option<Vec<Expression>>,

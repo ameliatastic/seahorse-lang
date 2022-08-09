@@ -41,6 +41,19 @@ fn from_template(mut text: String, project_name: &String) -> String {
     return text;
 }
 
+fn semver(outer_re: &str, version: &str) -> (u32, u32, u32) {
+    let outer_re = Regex::new(outer_re).unwrap();
+    let cap = outer_re.captures(version).unwrap();
+
+    let re = Regex::new(r"(\d+)\.(\d+)\.(\d+)").unwrap();
+    let cap = re.captures(&cap[1]).unwrap();
+    let major = cap[1].parse::<u32>().unwrap();
+    let minor = cap[2].parse::<u32>().unwrap();
+    let patch = cap[3].parse::<u32>().unwrap();
+
+    return (major, minor, patch);
+}
+
 /// Initializes a new Seahorse project.
 pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
     let path = Path::new(&args.project_name);
@@ -52,13 +65,24 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
         "Checking for dependencies...",
         "All dependencies found",
         || {
-            let anchor_installed = Command::new("anchor")
+            let anchor = Command::new("anchor")
                 .args(["-V"])
                 .output()
-                .unwrap()
-                .status
-                .success();
-            if !anchor_installed {
+                .map(|res| String::from_utf8(res.stdout).unwrap());
+            if let Ok(version) = anchor {
+                let (major, minor, patch) = semver("anchor-cli (.+)", &version);
+
+                if (major, minor) < (0, 24) {
+                    return Err(error_message(format!(
+                        concat!(
+                            "Anchor (>=0.24.0) not found\n\n",
+                            "Seahorse depends on Anchor (>=0.24.0), found: {}.{}.{}"
+                        ),
+                        major, minor, patch
+                    ))
+                    .into());
+                }
+            } else {
                 return Err(error_message(format!(
                     concat!(
                         "Anchor not found\n\n",
@@ -71,13 +95,10 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
                 .into());
             }
 
-            let rustfmt_installed = Command::new("rustfmt")
+            let rustfmt = Command::new("rustfmt")
                 .args(["-V"])
-                .output()
-                .unwrap()
-                .status
-                .success();
-            if !rustfmt_installed {
+                .output();
+            if !rustfmt.is_ok() {
                 return Err(error_message(format!(
                     concat!(
                         "rustfmt not found\n\n",
