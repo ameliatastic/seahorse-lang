@@ -239,6 +239,13 @@ class SolanaAccount:
     def key(self) -> Pubkey:
         """Get this account's key."""
 
+    def transfer_lamports(self, to: SolanaAccount, amount: u64):
+        """Transfer some SOL (as an amount of lamports) to another account.
+
+        Note: this will successfully transfer from a program-owned account without needing to
+        provide the seeds for a PDA, so no signer field is required (unlike the SPL methods).
+        """
+
 class Account(SolanaAccount):
     """User-defined Solana account."""
 

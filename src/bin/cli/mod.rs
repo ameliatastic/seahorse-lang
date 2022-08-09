@@ -1,10 +1,12 @@
-mod cli;
-mod init;
 mod build;
+mod cli;
 mod compile;
+mod init;
+mod update;
 pub mod util;
 
-pub use cli::*;
-pub use init::*;
 pub use build::*;
+pub use cli::*;
 pub use compile::*;
+pub use init::*;
+pub use update::*;

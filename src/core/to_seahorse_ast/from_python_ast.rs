@@ -21,6 +21,7 @@ pub enum UnsupportedError {
     ClassDefStatement,
     FunctionDefStatement,
     TypeNotRecognized,
+    ListType,
     ArrayTypeNotRecognized,
     TraitNotRecognized(String),
     TraitNotIdentifier,
@@ -63,15 +64,15 @@ impl From<UnsupportedError> for CoreError {
     fn from(error: UnsupportedError) -> Self {
         match error {
             UnsupportedError::ParamsWithKwargs => Self::make_raw(
-                "keyword args in functions are unsupported",
+                "keyword args in functions are not implemented yet",
                 ""
             ),
             UnsupportedError::ParamsWithVarargs => Self::make_raw(
-                "variadic args in functions are unsupported",
+                "variadic args in functions are not implemented yet",
                 ""
             ),
             UnsupportedError::ParamsWithDefaults => Self::make_raw(
-                "default values for function arguments are unsupported",
+                "default values for function arguments are not implemented yet",
                 ""
             ),
             UnsupportedError::ParamsWithoutType => Self::make_raw(
@@ -79,7 +80,7 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::Import => Self::make_raw(
-                "import statements are unsupported",
+                "import statements are not implemented yet",
                 ""
             ),
             UnsupportedError::AssertWithoutString => Self::make_raw(
@@ -87,11 +88,11 @@ impl From<UnsupportedError> for CoreError {
                 "Help: Seahorse 'assert' statements must have the following form:\n\n    assert condition, 'string literal'",
             ),
             UnsupportedError::DeleteStatement => Self::make_raw(
-                "'del' statements are unsupported",
+                "'del' statements are not implemented yet",
                 ""
             ),
             UnsupportedError::AssignToMultiple => Self::make_raw(
-                "multiple assignment is unsupported",
+                "multiple assignment is not implemented yet",
                 ""
             ),
             UnsupportedError::GlobalStatement => Self::make_raw(
@@ -103,11 +104,11 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::WhileWithElse => Self::make_raw(
-                "'while-else' statements are unsupported",
+                "'while-else' statements are not implemented yet",
                 "Hint: remove the 'else' block after the while loop."
             ),
             UnsupportedError::WithStatement => Self::make_raw(
-                "'with' statements are unsupported",
+                "'with' statements are not implemented yet",
                 ""
             ),
             UnsupportedError::AsyncForIn => Self::make_raw(
@@ -115,15 +116,15 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::ForInWithElse => Self::make_raw(
-                "'for-in-else' statements are unsupported",
+                "'for-in-else' statements are not implemented yet",
                 "Hint: remove the 'else' block after the for loop."
             ),
             UnsupportedError::RaiseStatement => Self::make_raw(
-                "'raise' statements are unsupported",
+                "'raise' statements are not implemented yet",
                 "Hint: if you want to throw an error, try using an assert."
             ),
             UnsupportedError::TryStatement => Self::make_raw(
-                "'try' statements are unsupported",
+                "'try' statements are not implemented yet",
                 ""
             ),
             UnsupportedError::ClassDefStatement => Self::make_raw(
@@ -137,6 +138,10 @@ impl From<UnsupportedError> for CoreError {
             UnsupportedError::TypeNotRecognized => Self::make_raw(
                 "unsupported type hint",
                 ""
+            ),
+            UnsupportedError::ListType => Self::make_raw(
+                "list type is not implemented yet",
+                "Help: Lists (and other mutable types) will be supported when Seahorse is out of beta. For now, you can try using an Array."
             ),
             UnsupportedError::ArrayTypeNotRecognized => Self::make_raw(
                 "unsupported array type hint",
@@ -155,19 +160,19 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::Yield => Self::make_raw(
-                "yield is unsupported",
+                "yield is not implemented yet",
                 ""
             ),
             UnsupportedError::YieldFrom => Self::make_raw(
-                "yield is unsupported",
+                "yield is not implemented yet",
                 ""
             ),
             UnsupportedError::CompareChain => Self::make_raw(
-                "comparison chains are unsupported (this will change in a future release)",
+                "comparison chains are not implemented yet (this will change in a future release)",
                 ""
             ),
             UnsupportedError::BigIntegers => Self::make_raw(
-                "big integers are unsupported",
+                "big integers are not implemented yet",
                 "Help: all integer values must fit into a Rust i64, which covers the range [-9223372036854775808, 9223372036854775807]."
             ),
             UnsupportedError::ComplexNumbers => Self::make_raw(
@@ -175,31 +180,31 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::DictExpression => Self::make_raw(
-                "dicts are unsupported",
+                "dicts are not implemented yet",
                 ""
             ),
             UnsupportedError::SetExpression => Self::make_raw(
-                "sets are unsupported",
+                "sets are not implemented yet",
                 ""
             ),
             UnsupportedError::ComprehensionNotList => Self::make_raw(
-                "non-list comprehensions are unsupported",
+                "non-list comprehensions are not implemented yet",
                 ""
             ),
             UnsupportedError::Starred => Self::make_raw(
-                "starred expressions are unsupported",
+                "starred expressions are not implemented yet",
                 ""
             ),
             UnsupportedError::Slice => Self::make_raw(
-                "slicing is unsupported",
+                "slicing is not implemented yet",
                 ""
             ),
             UnsupportedError::FStringWithSpec => Self::make_raw(
-                "f-strings with format specifiers are unsupported",
+                "f-strings with format specifiers are not implemented yet",
                 "Help: f-strings are only supported in a basic way, try using no format specifier:\n\n    f'This is an {element}'"
             ),
             UnsupportedError::ByteString => Self::make_raw(
-                "bytestrings are unsupported",
+                "bytestrings are not implemented yet",
                 ""
             ),
             UnsupportedError::UnderscoreIdentifier => Self::make_raw(
@@ -207,23 +212,23 @@ impl From<UnsupportedError> for CoreError {
                 "Help: in Rust, single-underscore (_) is not a valid identifier."
             ),
             UnsupportedError::Lambda => Self::make_raw(
-                "lambda functions are unsupported",
+                "lambda functions are not implemented yet",
                 "Help: try moving this lambda into a new top-level function."
             ),
             UnsupportedError::Ternary => Self::make_raw(
-                "ternary expressions are unsupported",
+                "ternary expressions are not implemented yet",
                 ""
             ), // TODO support
             UnsupportedError::NamedExpression => Self::make_raw(
-                "the walrus operator is unsupported",
+                "the walrus operator is not implemented yet",
                 ""
             ),
             UnsupportedError::NoneExpression => Self::make_raw(
-                "the None keyword is unsupported",
+                "the None keyword is not implemented yet",
                 ""
             ),
             UnsupportedError::Ellipsis => Self::make_raw(
-                "ellipsis are unsupported",
+                "ellipsis are not implemented yet",
                 ""
             ),
             UnsupportedError::MatMultOp => Self::make_raw(
@@ -231,11 +236,11 @@ impl From<UnsupportedError> for CoreError {
                 ""
             ),
             UnsupportedError::InOp => Self::make_raw(
-                "the 'in' operator is unsupported",
+                "the 'in' operator is not implemented yet",
                 ""
             ),
             UnsupportedError::NotInOp => Self::make_raw(
-                "the 'not in' operator is unsupported",
+                "the 'not in' operator is not implemented yet",
                 ""
             ),
             UnsupportedError::InvalidPattern => Self::make_raw(
@@ -512,6 +517,7 @@ impl TryFrom<Expression> for Ty {
                     "Empty" => Ok(Ty::Empty(box_try_into(index)?)),
                     // TODO disabling lists for now
                     // "List" => Ok(Ty::List(box_try_into(index)?)),
+                    "List" => Err(UnsupportedError::ListType),
                     "Array" => match index.as_tuple2() {
                         Some((expr, Expression::Int(len))) => Ok(Self::Array(
                             Box::new(expr.try_into()?),

@@ -56,6 +56,14 @@ fn semver(outer_re: &str, version: &str) -> (u32, u32, u32) {
 
 /// Initializes a new Seahorse project.
 pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
+    if &args.project_name.to_snake_case() != &args.project_name {
+        return Err(error_message(format!(
+            "Project name must be snake case - try \"{}\"",
+            args.project_name.to_snake_case()
+        ))
+        .into());
+    }
+
     let path = Path::new(&args.project_name);
     if path.exists() {
         return Err(error_message("project directory already exists").into());
@@ -95,9 +103,7 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
                 .into());
             }
 
-            let rustfmt = Command::new("rustfmt")
-                .args(["-V"])
-                .output();
+            let rustfmt = Command::new("rustfmt").args(["-V"]).output();
             if !rustfmt.is_ok() {
                 return Err(error_message(format!(
                     concat!(
@@ -108,6 +114,36 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
                     ),
                     "https://github.com/rust-lang/rustfmt".blue()
                 )).into());
+            }
+
+            let solana = Command::new("solana")
+                .args(["-V"])
+                .output()
+                .map(|res| String::from_utf8(res.stdout).unwrap());
+            if let Ok(version) = solana {
+                let (major, minor, patch) = semver(r"solana-cli (\S+)", &version);
+
+                if (major, minor) < (1, 9) {
+                    return Err(error_message(format!(
+                        concat!(
+                            "Solana (>=1.9.0) not found\n\n",
+                            "Seahorse depends on Anchor (>=1.9.0), found: {}.{}.{}"
+                        ),
+                        major, minor, patch
+                    ))
+                    .into());
+                }
+            } else {
+                return Err(error_message(format!(
+                    concat!(
+                        "Solana not found\n\n",
+                        "Seahorse depends on the Solana tool suite",
+                        "Installation instructions can be found here:\n",
+                        "{}"
+                    ),
+                    "https://docs.solana.com/cli/install-solana-cli-tools".blue()
+                ))
+                .into());
             }
 
             Ok(())
@@ -142,7 +178,7 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             let src_path = path.join(SRC_PATH);
             let lib_path = src_path.join(LIB_PATH);
             let program_path = path.join("programs").join(&args.project_name);
-            let src_name = format!("{}.py", args.project_name.to_snake_case());
+            let src_name = format!("{}.py", args.project_name);
 
             create_dir_all(src_path.clone())?;
             create_dir_all(lib_path.clone())?;

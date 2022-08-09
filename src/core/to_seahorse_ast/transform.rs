@@ -66,7 +66,7 @@ impl From<Error> for CoreError {
             Error::SeedsUnsupportedType(ty) => Self::make_raw(
                 "unsupported type for seed",
                 format!(
-                    "Hint: initializer/signer seeds may be other accounts, string literals, and u8s. Found: {}",
+                    "Hint: initializer/signer seeds may be other accounts, strings, and integers. Found: {}",
                     ty
                 )
             ),
@@ -327,7 +327,7 @@ impl TransformPass {
                     panic!("Encountered an unknown initializer?");
                 }
             }
-            Expression::SolTransfer { ..} => Ty::Unit,
+            Expression::SolTransfer { .. } => Ty::Unit,
             Expression::CpiCall { .. } => Ty::Unit,
             Expression::GetBump { .. } => Ty::U8,
             Expression::FString { .. } => Ty::String,
@@ -491,13 +491,14 @@ impl TransformPass {
                             .position(|Instruction { handler_name, .. }| &def.name == handler_name)
                             .unwrap();
                         let instruction = instructions.get_mut(index).unwrap();
-                        context.accounts = replace(&mut instruction.accounts, Vec::new());
+                        context.accounts =
+                            replace(&mut instruction.accounts_context.accounts, Vec::new());
 
                         self.context = context;
                         let def = self.transform_function(def)?;
 
                         let context = replace(&mut self.context, CurrentContext::new());
-                        instruction.accounts = context.as_accounts();
+                        instruction.accounts_context = context.as_accounts_context();
 
                         Def::FunctionDef(def)
                     }
@@ -610,7 +611,10 @@ impl TransformPass {
         let instruction = Instruction {
             name,
             context_name,
-            accounts,
+            accounts_context: AccountsContext {
+                accounts,
+                params: Vec::new(),
+            },
             params: params.clone(),
             handler_name: handler_name.clone(),
         };
@@ -994,6 +998,16 @@ impl TransformPass {
             }
             Expression::Id(name) => {
                 if self.name_exists(&name) {
+                    if self.context.in_instruction && self.context.allow_inits {
+                        let ty = self.infer_type(&Expression::Id(name.clone()));
+                        // Kind of a hack - since use_params can only ever contain instruction
+                        // params, nothing will have an Any type. This check is needed because this
+                        // code also runs on the first statement after all the inits have taken
+                        // place.
+                        if !self.is_account_type(&ty) && ty != Ty::Any {
+                            self.context.use_params.insert(name.clone(), ty);
+                        }
+                    }
                     Ok(Expression::Id(name))
                 } else {
                     Err(Error::UnknownVariable(name.clone()).into_core())
@@ -1655,10 +1669,7 @@ impl TransformPass {
                     (ty, "transfer_lamports") if self.is_account_type(&ty) => {
                         let mut args = self.transform_call_args(
                             args,
-                            &vec![
-                                Param::new("to", Ty::Any),
-                                Param::new("amount", Ty::U64)
-                            ],
+                            &vec![Param::new("to", Ty::Any), Param::new("amount", Ty::U64)],
                         )?;
                         let mut arg = move |name: &str| args.remove(name);
 
@@ -1672,9 +1683,9 @@ impl TransformPass {
                             to: Box::new(to),
                             amount: Box::new(amount),
                             pda: match ty {
-                                Ty::ExactDefined { is_acc, ..} => is_acc,
-                                _ => false
-                            }
+                                Ty::ExactDefined { is_acc, .. } => is_acc,
+                                _ => false,
+                            },
                         })
                     }
                     (Ty::ExactDefined { name, .. }, attr) if self.ty_defs.contains_key(&name) => {
@@ -1746,6 +1757,12 @@ impl TransformPass {
                 Ty::U8 => seed
                     .with_call("to_le_bytes", vec![])
                     .with_call("as_ref", vec![]),
+                Ty::U64 => seed
+                    .with_call("to_le_bytes", vec![])
+                    .with_call("as_ref", vec![]),
+                Ty::I64 => seed
+                    .with_call("to_le_bytes", vec![])
+                    .with_call("as_ref", vec![]),
                 Ty::Pubkey => seed.with_call("as_ref", vec![]),
                 ty if self.is_account_type(&ty) => {
                     seed.with_call("key", vec![]).with_call("as_ref", vec![])
@@ -1767,6 +1784,7 @@ struct CurrentContext {
     infer_system_program: bool,
     infer_token_program: bool,
     infer_rent: bool,
+    use_params: HashMap<String, Ty>,
 }
 
 impl CurrentContext {
@@ -1778,10 +1796,11 @@ impl CurrentContext {
             infer_system_program: false,
             infer_token_program: false,
             infer_rent: false,
+            use_params: HashMap::new(),
         }
     }
 
-    fn as_accounts(self) -> Vec<Account> {
+    fn as_accounts_context(self) -> AccountsContext {
         let mut accounts = self.accounts;
         if self.infer_system_program {
             accounts.push(Account::system_program());
@@ -1793,7 +1812,10 @@ impl CurrentContext {
             accounts.push(Account::rent());
         }
 
-        return accounts;
+        return AccountsContext {
+            accounts,
+            params: self.use_params.into_iter().collect(),
+        };
     }
 
     fn find_index(&self, name: &String) -> Option<usize> {

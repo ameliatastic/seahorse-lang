@@ -5,7 +5,6 @@ use crate::{
 use clap::Args;
 use owo_colors::OwoColorize;
 use std::{
-    env::current_dir,
     error::Error,
     fs::File,
     io::{Read, Write},
@@ -22,8 +21,18 @@ pub struct BuildArgs {
 
 /// Build a single program.
 fn build_program(project_path: &PathBuf, program_name: String) -> Result<String, Box<dyn Error>> {
+    let first_build = !project_path
+        .join("target")
+        .join("deploy")
+        .join(format!("{}.so", program_name))
+        .exists();
+
     let output = with_spinner(
-        format!("Compiling {}...", program_name.bold()),
+        if first_build {
+            format!("Compiling {}... (note: if this is your first time building, it might take a few minutes)", program_name.bold())
+        } else {
+            format!("Compiling {}...", program_name.bold())
+        },
         format!("Compiled {}", program_name.bold()),
         || {
             let input_path = project_path
@@ -70,21 +79,13 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
 
 /// Builds a Seahorse program.
 pub fn build(args: BuildArgs) -> Result<(), Box<dyn Error>> {
-    let mut path = current_dir()?;
-    loop {
-        if path.join("Anchor.toml").exists() {
-            break;
-        }
-        if !path.pop() {
-            return Err(error_message("not in a Seahorse project").into());
-        }
-    }
+    let root = project_root()?;
 
     if let Some(program_name) = args.program {
-        let output = build_program(&path, program_name)?;
+        let output = build_program(&root, program_name)?;
         print!("{}", output);
     } else {
-        let src_path = path.join(SRC_PATH);
+        let src_path = root.join(SRC_PATH);
         let programs = src_path.read_dir()?.filter_map(|entry| {
             let path = entry.unwrap().path();
             let ext = path.extension();
@@ -97,7 +98,7 @@ pub fn build(args: BuildArgs) -> Result<(), Box<dyn Error>> {
 
         let output: Vec<_> = programs
             .into_iter()
-            .map(|program_name| build_program(&path, program_name))
+            .map(|program_name| build_program(&root, program_name))
             .collect();
         let has_err = output.iter().any(|result| result.is_err());
 

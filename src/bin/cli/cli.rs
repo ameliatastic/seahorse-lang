@@ -20,7 +20,9 @@ pub enum CliCommand {
     /// Builds a Seahorse program
     Build(BuildArgs),
     /// Compiles a single Seahorse file
-    Compile(CompileArgs)
+    Compile(CompileArgs),
+    /// Updates the Seahorse Python libraries
+    Update(UpdateArgs),
 }
 
 /// Run the CLI.
@@ -30,7 +32,8 @@ pub fn run() {
     let res = match args.command {
         CliCommand::Init(args) => init(args),
         CliCommand::Build(args) => build(args),
-        CliCommand::Compile(args) => compile(args)
+        CliCommand::Compile(args) => compile(args),
+        CliCommand::Update(args) => update(args),
     };
 
     if let Err(err) = res {

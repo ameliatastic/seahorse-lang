@@ -27,9 +27,15 @@ pub enum Def {
 pub struct Instruction {
     pub name: String,
     pub context_name: String,
-    pub accounts: Vec<Account>,
+    pub accounts_context: AccountsContext,
     pub params: Vec<Param>,
     pub handler_name: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct AccountsContext {
+    pub accounts: Vec<Account>,
+    pub params: Vec<(String, Ty)>,
 }
 
 /// A defined type.
@@ -272,7 +278,7 @@ pub enum Expression {
     },
     Block {
         body: Vec<Statement>,
-        returns: Box<Expression>
+        returns: Box<Expression>,
     },
     Log {
         format: String,
@@ -286,7 +292,7 @@ pub enum Expression {
         from: Box<Expression>,
         to: Box<Expression>,
         amount: Box<Expression>,
-        pda: bool
+        pda: bool,
     },
     CpiCall {
         cpi: Box<Cpi>,

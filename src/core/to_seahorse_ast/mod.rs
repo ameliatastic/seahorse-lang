@@ -12,4 +12,3 @@ pub fn from_python_ast(python_ast: py::Program) -> Result<Program, CoreError> {
 
     return Ok(program);
 }
-

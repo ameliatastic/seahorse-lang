@@ -27,10 +27,9 @@ impl ToTokens for Def {
                 #[derive(AnchorSerialize, AnchorDeserialize, Default, Debug, Clone, PartialEq)]
                 #def
             },
-            Def::FunctionDef(def) =>
-                quote! {
-                    #def
-                },
+            Def::FunctionDef(def) => quote! {
+                #def
+            },
             Def::RawInstructionDef { .. } | Def::RawDeclareId(..) | Def::RawImport => {
                 panic!("Encountered an unformattable def {:?}", self)
             }
@@ -321,7 +320,6 @@ impl ToTokens for FunctionDef {
     }
 }
 
-
 impl ToTokens for Statement {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self {
@@ -583,7 +581,12 @@ impl ToTokens for Expression {
 
                 quote! { #name }
             }
-            Expression::SolTransfer { from, to, amount, pda } => {
+            Expression::SolTransfer {
+                from,
+                to,
+                amount,
+                pda,
+            } => {
                 if *pda {
                     quote! {
                         {
@@ -702,7 +705,7 @@ impl ToTokens for Expression {
                 let value = Grouped(&value);
 
                 quote! { (#value).clone() }
-            },
+            }
             Expression::List(value) => {
                 let value = value.iter().map(|element| Grouped(element));
 
@@ -812,7 +815,7 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
     for instruction in instructions.iter() {
         contexts.push((
             instruction.context_name.clone(),
-            instruction.accounts.clone(),
+            instruction.accounts_context.clone(),
         ));
     }
 
@@ -829,15 +832,31 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
         #(#defs)*
     });
 
-    for (name, accounts) in contexts.into_iter() {
+    for (name, accounts_context) in contexts.into_iter() {
         let name = ident(&name);
+        let AccountsContext { accounts, params } = accounts_context;
+        let params = params.into_iter().map(|(name, ty)| {
+            let name = ident(&name);
 
-        tokens.extend(quote! {
-            #[derive(Accounts)]
-            pub struct #name<'info> {
-                #(#accounts),*
-            }
+            quote! { #name: #ty }
         });
+
+        if params.len() > 0 {
+            tokens.extend(quote! {
+                #[derive(Accounts)]
+                #[instruction(#(#params),*)]
+                pub struct #name<'info> {
+                    #(#accounts),*
+                }
+            });
+        } else {
+            tokens.extend(quote! {
+                #[derive(Accounts)]
+                pub struct #name<'info> {
+                    #(#accounts),*
+                }
+            });
+        }
     }
 
     let errors = errors.into_iter().map(|(throw, msg)| {
