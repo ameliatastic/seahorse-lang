@@ -45,3 +45,7 @@ class Initializer(Generic[T]):
 
 def instruction(function: Callable[..., None]) -> Callable[..., ProgramResult]:
     """Turn a function into a program instruction."""
+
+class Event:
+    """An Anchor program event."""
+    pass
