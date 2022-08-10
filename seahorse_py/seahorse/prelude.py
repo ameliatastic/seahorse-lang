@@ -49,3 +49,6 @@ def instruction(function: Callable[..., None]) -> Callable[..., ProgramResult]:
 class Event:
     """An Anchor program event."""
     pass
+
+def emit(event: Event):
+    """Emit an event."""

@@ -200,7 +200,7 @@ impl TransformPass {
         match name.as_str() {
             "abs" | "pow" | "repr" | "sorted" | "str" | "sum" | "type" | "len" | "range"
             | "print" | "u8" | "u64" | "i64" | "f64" | "round" | "ceil" | "floor" | "min"
-            | "max" => {
+            | "max" | "emit" => {
                 return true;
             }
             _ => {}
@@ -330,6 +330,7 @@ impl TransformPass {
             Expression::SolTransfer { .. } => Ty::Unit,
             Expression::CpiCall { .. } => Ty::Unit,
             Expression::GetBump { .. } => Ty::U8,
+            Expression::Emit { .. } => Ty::Unit,
             Expression::FString { .. } => Ty::String,
             Expression::List(value) => {
                 if value.len() == 0 {
@@ -1198,6 +1199,13 @@ impl TransformPass {
                     let x = args.remove("x").unwrap();
 
                     Ok(x.with_call("abs", vec![]))
+                }
+                "emit" => {
+                    let mut args =
+                        self.transform_call_args(args, &vec![Param::new("e", Ty::Event)])?;
+
+                    let e = args.remove("e").unwrap();
+                    Ok(Expression::Emit { event: Box::new(e) })
                 }
                 "pow" => {
                     let mut args = self.transform_call_args(

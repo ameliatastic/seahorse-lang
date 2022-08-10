@@ -205,6 +205,7 @@ pub enum Ty {
     TokenProgram,
     Rent,
     ProgramResult,
+    Event,
     Context(String),
     // Other types
     Defined(String),
@@ -301,6 +302,9 @@ pub enum Expression {
     },
     GetBump {
         name: String,
+    },
+    Emit {
+        event: Box<Expression>,
     },
     FString {
         format: String,

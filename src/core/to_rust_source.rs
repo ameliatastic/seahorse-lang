@@ -268,6 +268,7 @@ impl ToTokens for Ty {
             Ty::Empty(ty) => quote! { #ty },
             Ty::TokenAccount => quote! { token::TokenAccount },
             Ty::TokenMint => quote! { token::Mint },
+            Ty::Event => quote! { "" },
             Ty::ExactDefined {
                 name, is_acc: true, ..
             } => {
@@ -702,6 +703,9 @@ impl ToTokens for Expression {
             }
             Expression::GetBump { name } => quote! {
                 *ctx.bumps.get(#name).unwrap()
+            },
+            Expression::Emit { event } => quote! {
+                emit!(#event)
             },
             Expression::FString { format, args } => quote! {
                 format!(#format, #(#args),*)
