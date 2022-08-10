@@ -543,6 +543,7 @@ impl TryFrom<py::Expression> for TraitName {
             py::ExpressionType::Identifier { name } => match name.as_str() {
                 "Enum" => Ok(TraitName::Enum),
                 "Account" => Ok(TraitName::Account),
+                "Event" => Ok(TraitName::Event),
                 // Decorators
                 "instruction" => Ok(TraitName::Instruction), // TODO separate from trait types
                 name => Err(UnsupportedError::TraitNotRecognized(name.to_string())),

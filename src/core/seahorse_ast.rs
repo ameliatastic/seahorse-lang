@@ -229,6 +229,7 @@ pub enum TyParam {
 pub enum TraitName {
     Enum,
     Account,
+    Event,
     Instruction,
 }
 
@@ -553,7 +554,7 @@ impl TraitName {
                 "key" => Some(Ty::function0(Ty::Pubkey)),
                 _ => None,
             },
-            Self::Enum | Self::Instruction => None,
+            Self::Enum | Self::Instruction | Self::Event => None,
         }
     }
 
@@ -637,6 +638,14 @@ impl TyDef {
     pub fn is_account(&self) -> bool {
         match self {
             TyDef::Struct { traits, .. } => traits.contains(&TraitName::Account),
+            _ => false,
+        }
+    }
+
+    /// Return whether this type def is an event.
+    pub fn is_event(&self) -> bool {
+        match self {
+            TyDef::Struct { traits, .. } => traits.contains(&TraitName::Event),
             _ => false,
         }
     }

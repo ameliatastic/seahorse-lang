@@ -19,6 +19,11 @@ impl ToTokens for Def {
                 #[account]
                 #def
             },
+            Def::TyDef(def) if def.is_event() => quote! {
+                #[derive(Debug)]
+                #[event]
+                #def
+            },
             Def::TyDef(def) if def.is_enum() => quote! {
                 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
                 #def
