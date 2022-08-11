@@ -66,7 +66,7 @@ impl From<Error> for CoreError {
             Error::SeedsUnsupportedType(ty) => Self::make_raw(
                 "unsupported type for seed",
                 format!(
-                    "Hint: initializer/signer seeds may be other accounts, strings, integers and arrays of U8. Found: {}",
+                    "Hint: initializer/signer seeds may be other accounts, strings, integers, and u8 arrays. Found: {}",
                     ty
                 )
             ),
@@ -1750,8 +1750,7 @@ impl TransformPass {
     ) -> Result<Vec<Expression>, CoreError> {
         let mut seeds = Vec::new();
         for seed in raw_seeds.into_iter() {
-            let ty = self.infer_type(&seed);
-            seeds.push(match ty {
+            seeds.push(match self.infer_type(&seed) {
                 Ty::String => seed
                     .with_call("as_bytes", vec![])
                     .with_call("as_ref", vec![]),
@@ -1768,12 +1767,7 @@ impl TransformPass {
                 ty if self.is_account_type(&ty) => {
                     seed.with_call("key", vec![]).with_call("as_ref", vec![])
                 }
-                Ty::Array(ref t, _) => match **t {
-                    Ty::U8 => seed.with_call("as_ref", vec![]),
-                    _ => {
-                        return Err(Error::SeedsUnsupportedType(ty).into_core());
-                    }
-                },
+                Ty::Array(el_type, ..) if *el_type == Ty::U8 => seed.with_call("as_ref", vec![]),
                 ty => {
                     return Err(Error::SeedsUnsupportedType(ty).into_core());
                 }
