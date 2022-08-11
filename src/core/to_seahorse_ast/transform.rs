@@ -66,7 +66,7 @@ impl From<Error> for CoreError {
             Error::SeedsUnsupportedType(ty) => Self::make_raw(
                 "unsupported type for seed",
                 format!(
-                    "Hint: initializer/signer seeds may be other accounts, strings, and integers. Found: {}",
+                    "Hint: initializer/signer seeds may be other accounts, strings, integers, and u8 arrays. Found: {}",
                     ty
                 )
             ),
@@ -1767,6 +1767,7 @@ impl TransformPass {
                 ty if self.is_account_type(&ty) => {
                     seed.with_call("key", vec![]).with_call("as_ref", vec![])
                 }
+                Ty::Array(el_type, ..) if *el_type == Ty::U8 => seed.with_call("as_ref", vec![]),
                 ty => {
                     return Err(Error::SeedsUnsupportedType(ty).into_core());
                 }
