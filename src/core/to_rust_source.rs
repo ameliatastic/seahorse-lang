@@ -76,6 +76,9 @@ impl ToTokens for Account {
             (Ty::TokenProgram, None) => quote! {
                 pub token_program: Program<'info, token::Token>
             },
+            (Ty::AssociatedTokenProgram, None) => quote! {
+                pub associated_token_program: Program<'info, associated_token::AssociatedToken>
+            },
             (Ty::Rent, None) => quote! {
                 pub rent: Sysvar<'info, Rent>
             },
@@ -106,6 +109,7 @@ impl<'t> ToTokens for InAccounts<'t> {
             Ty::Signer => quote! { Signer<'info> },
             Ty::TokenAccount => quote! { Box<Account<'info, token::TokenAccount>> },
             Ty::TokenMint => quote! { Box<Account<'info, token::Mint>> },
+            Ty::AssociatedTokenAccount => quote! { Box<Account<'info, token::TokenAccount>> },
             Ty::Empty(ty) => {
                 let ty = InAccounts(&ty);
 
@@ -167,7 +171,16 @@ impl ToTokens for AccountInit {
                 quote! {
                     __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#seeds),*], bump, mint::decimals = #decimals, mint::authority = #authority]]],
                 }
-            }
+            },
+            AccountInit::AssociatedTokenAccount { payer, mint, authority } => {
+              let payer = ident(payer);
+              let mint = ident(mint);
+              let authority = ident(authority);
+
+              quote! {
+                  __SEAHORSE_INIT__: account![[[init, payer = #payer, associated_token::mint = #mint, associated_token::authority = #authority]]],
+              }
+          }
         })
     }
 }
@@ -263,6 +276,7 @@ impl ToTokens for Ty {
             Ty::Empty(ty) => quote! { #ty },
             Ty::TokenAccount => quote! { token::TokenAccount },
             Ty::TokenMint => quote! { token::Mint },
+            Ty::AssociatedTokenAccount => quote! { token::TokenAccount },
             Ty::ExactDefined {
                 name, is_acc: true, ..
             } => {
@@ -281,6 +295,7 @@ impl ToTokens for Ty {
             | Ty::Iter(..)
             | Ty::SystemProgram
             | Ty::TokenProgram
+            | Ty::AssociatedTokenProgram
             | Ty::Rent
             | Ty::Defined(..)
             | Ty::Tuple(..)
@@ -824,6 +839,7 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
     tokens.extend(quote! {
         use anchor_lang::prelude::*;
         use anchor_spl::token;
+        use anchor_spl::associated_token;
         use anchor_lang::solana_program;
         use std::convert::TryFrom;
 

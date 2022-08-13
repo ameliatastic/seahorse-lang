@@ -187,9 +187,11 @@ impl TransformPass {
             Ty::Signer
             | Ty::TokenAccount
             | Ty::TokenMint
+            | Ty::AssociatedTokenAccount
             | Ty::Empty(_)
             | Ty::SystemProgram
-            | Ty::TokenProgram => true,
+            | Ty::TokenProgram
+            | Ty::AssociatedTokenProgram => true,
             Ty::ExactDefined { is_acc, .. } => *is_acc,
             _ => false,
         }
@@ -1515,6 +1517,52 @@ impl TransformPass {
                             signer,
                         })
                     }
+                    (Ty::AssociatedTokenAccount, "amount") => {
+                        // associated_token_account.amount()
+                        self.transform_call_args(args, &vec![])?;
+
+                        Ok(Expression::Attribute {
+                            value,
+                            attr: "amount".to_string(),
+                        })
+                    }
+                    (Ty::AssociatedTokenAccount, "authority") => {
+                        // associated_token_account.authority()
+                        self.transform_call_args(args, &vec![])?;
+
+                        Ok(Expression::Attribute {
+                            value,
+                            attr: "owner".to_string(),
+                        })
+                    }
+                    (Ty::AssociatedTokenAccount, "transfer") => {
+                        // associated_token_account.transfer(authority, to, amount)
+                        let mut args = self.transform_call_args(
+                            args,
+                            &vec![
+                                Param::new("authority", Ty::Any),
+                                Param::new("to", Ty::TokenAccount),
+                                Param::new("amount", Ty::U64),
+                            ],
+                        )?;
+                        let mut arg = move |name: &str| args.remove(name);
+
+                        // TODO typecheck authority
+                        let authority = arg("authority").unwrap();
+                        let to = arg("to").unwrap();
+                        let amount = arg("amount").unwrap();
+                        self.context.infer_token_program = true;
+
+                        Ok(Expression::CpiCall {
+                            cpi: Box::new(Cpi::TokenTransfer {
+                                from: *value,
+                                to,
+                                authority,
+                                amount,
+                            }),
+                            signer: None,
+                        })
+                    }
                     (Ty::TokenMint, "burn") => {
                         // token_mint.burn(authority, to, amount)
                         let mut args = self.transform_call_args(
@@ -1624,6 +1672,31 @@ impl TransformPass {
                                     payer,
                                     seeds,
                                     decimals: decimals as u8,
+                                    authority,
+                                }
+                            }
+                            Ty::AssociatedTokenAccount => {
+                                let mut args = self.transform_call_args(
+                                    args,
+                                    &vec![
+                                        Param::new("payer", Ty::Signer),
+                                        Param::new("mint", Ty::TokenMint),
+                                        Param::new("authority", Ty::Any),
+                                    ],
+                                )?;
+                                let mut arg = move |name: &str| args.remove(name).unwrap();
+
+                                let payer = arg("payer").as_id().unwrap();
+                                let mint = arg("mint").as_id().unwrap();
+                                let authority = arg("authority").as_id().unwrap();
+
+                                self.context.infer_token_program = true;
+                                self.context.infer_associated_token_program = true;
+                                self.context.infer_rent = true;
+
+                                AccountInit::AssociatedTokenAccount {
+                                    payer,
+                                    mint,
                                     authority,
                                 }
                             }
@@ -1784,6 +1857,7 @@ struct CurrentContext {
     allow_inits: bool,
     infer_system_program: bool,
     infer_token_program: bool,
+    infer_associated_token_program: bool,
     infer_rent: bool,
     use_params: HashMap<String, Ty>,
 }
@@ -1796,6 +1870,7 @@ impl CurrentContext {
             allow_inits: true,
             infer_system_program: false,
             infer_token_program: false,
+            infer_associated_token_program: false,
             infer_rent: false,
             use_params: HashMap::new(),
         }
@@ -1808,6 +1883,9 @@ impl CurrentContext {
         }
         if self.infer_token_program {
             accounts.push(Account::token_program());
+        }
+        if self.infer_associated_token_program {
+            accounts.push(Account::associated_token_program());
         }
         if self.infer_rent {
             accounts.push(Account::rent());

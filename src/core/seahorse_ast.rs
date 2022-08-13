@@ -103,6 +103,11 @@ pub enum AccountInit {
         decimals: u8,
         authority: String,
     },
+    AssociatedTokenAccount {
+        payer: String,
+        mint: String,
+        authority: String,
+    },
 }
 
 /// A statement that can be translated to Rust.
@@ -201,8 +206,10 @@ pub enum Ty {
     Empty(Box<Ty>),
     TokenAccount,
     TokenMint,
+    AssociatedTokenAccount,
     SystemProgram,
     TokenProgram,
+    AssociatedTokenProgram,
     Rent,
     ProgramResult,
     Context(String),
@@ -431,11 +438,16 @@ impl Ty {
     /// Get the type of an attribute of this type.
     pub fn get_attr(&self, attr: &str) -> Option<Self> {
         Some(match (self, attr) {
-            (Self::TokenAccount, "amount") => Self::U64,
-            (Self::TokenAccount, "owner") => Self::Pubkey,
-            (Self::Empty(..) | Self::Signer | Self::TokenAccount | Self::TokenMint, "key") => {
-                Self::function0(Self::Pubkey)
-            }
+            (Self::TokenAccount | Self::AssociatedTokenAccount, "amount") => Self::U64,
+            (Self::TokenAccount | Self::AssociatedTokenAccount, "owner") => Self::Pubkey,
+            (
+                Self::Empty(..)
+                | Self::Signer
+                | Self::TokenAccount
+                | Self::TokenMint
+                | Self::AssociatedTokenAccount,
+                "key",
+            ) => Self::function0(Self::Pubkey),
             (Self::U8 | Self::U64 | Self::I64 | Self::F64, "abs") => Self::Function {
                 params: vec![],
                 returns: Box::new(self.clone()),
@@ -488,6 +500,7 @@ impl Ty {
             {
                 self_.fits_as(&*other_)
             }
+            (Self::AssociatedTokenAccount, Self::TokenAccount) => true,
             (self_, Self::Union(opts)) => opts.iter().any(|opt| self_.fits_as(opt)),
             (_, Self::Any) => true,
             _ => self == other,
@@ -517,7 +530,8 @@ impl Ty {
             | Self::Signer
             | Self::Empty(..)
             | Self::TokenAccount
-            | Self::TokenMint => true,
+            | Self::TokenMint
+            | Self::AssociatedTokenAccount => true,
             _ => false,
         }
     }
@@ -722,6 +736,14 @@ impl Account {
         Account {
             name: "token_program".to_string(),
             account_type: Ty::TokenProgram,
+            init: None,
+        }
+    }
+
+    pub fn associated_token_program() -> Self {
+        Account {
+            name: "associated_token_program".to_string(),
+            account_type: Ty::AssociatedTokenProgram,
             init: None,
         }
     }

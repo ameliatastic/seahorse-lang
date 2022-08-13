@@ -509,6 +509,7 @@ impl TryFrom<Expression> for Ty {
                 "Signer" => Ty::Signer,
                 "TokenAccount" => Ty::TokenAccount,
                 "TokenMint" => Ty::TokenMint,
+                "AssociatedTokenAccount" => Ty::AssociatedTokenAccount,
                 // User types
                 name => Ty::Defined(name.to_string()),
             }),
