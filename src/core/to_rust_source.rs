@@ -3,7 +3,8 @@ use crate::core::{seahorse_ast::*, CoreError};
 use heck::ToSnakeCase;
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use regex::{Captures, Regex};
+use regex::Regex;
+#[cfg(not(target_arch = "wasm32"))]
 use rustfmt_wrapper::{config::*, rustfmt_config, Error as RustfmtError};
 
 /// Convenience function for turning strings into Idents
@@ -11,14 +12,31 @@ fn ident<S: ToString>(name: &S) -> Ident {
     format_ident!("{}", name.to_string())
 }
 
+fn account_token_stream(def: &TyDef) -> TokenStream {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        return quote! {
+            #[derive(Debug)]
+            #[account]
+            #def
+        };
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // This is technically a rust compiler version limitation, rather than wasm
+        // When compiling to wasm for Playground, we need to work around #![feature(macro_attributes_in_derive_output)]
+        // which is not supported by that version of Rust
+        return quote! {
+            #[account]
+            #def
+        };
+    }
+}
+
 impl ToTokens for Def {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self {
-            Def::TyDef(def) if def.is_account() => quote! {
-                #[derive(Debug)]
-                #[account]
-                #def
-            },
+            Def::TyDef(def) if def.is_account() => account_token_stream(def),
             Def::TyDef(def) if def.is_enum() => quote! {
                 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
                 #def
@@ -816,6 +834,25 @@ impl ToTokens for Pattern {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn rustfmt(tokens: TokenStream) -> Result<String, CoreError> {
+    let config = Config {
+        // Maybe there will be something here one day
+        ..Config::default()
+    };
+    return rustfmt_config(config, tokens).map_err(|err| match err {
+        RustfmtError::NoRustfmt => CoreError::make_raw(
+            "rustfmt not installed",
+            "Help: Seahorse depends on rustfmt, which is part of the Rust toolchain. To install:\n\n    rustup components add rustfmt"
+        ),
+        RustfmtError::Rustfmt(message) => CoreError::make_raw(
+            "rustfmt error",
+            format!("{}This is most likely an error in Seahorse.", message)
+        ),
+        _ => CoreError::make_raw("unknown rustfmt error", ""),
+    });
+}
+
 pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, CoreError> {
     // println!("{:#?}", ast);
 
@@ -904,25 +941,28 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
         });
     }
 
-    // Run rustfmt
-    let config = Config {
-        // Maybe there will be something here one day
-        ..Config::default()
-    };
-    let mut source = rustfmt_config(config, tokens).map_err(|err| match err {
-        RustfmtError::NoRustfmt => CoreError::make_raw(
-            "rustfmt not installed",
-            "Help: Seahorse depends on rustfmt, which is part of the Rust toolchain. To install:\n\n    rustup components add rustfmt"
-        ),
-        RustfmtError::Rustfmt(message) => CoreError::make_raw(
-            "rustfmt error",
-            format!("{}This is most likely an error in Seahorse.", message)
-        ),
-        _ => CoreError::make_raw("unknown rustfmt error", ""),
-    })?;
+    // Run rustfmt, except on wasm
+    let mut source: String;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        source = rustfmt(tokens)?;
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        source = tokens.to_string();
+    }
 
     // Put init lines back
-    let re = Regex::new(r"(?s)__SEAHORSE_INIT__: account!\[\[\[(.*?)\]\]\],").unwrap();
+    // Note the spacing here is a bit different depending if rustfmt ran or not
+    let re: Regex;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        re = Regex::new(r"(?s)__SEAHORSE_INIT__: account!\[\[\[(.*?)\]\]\],").unwrap();
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        re = Regex::new(r"(?s)__SEAHORSE_INIT__ : account ! \[\[\[(.*?)\]\]\] ,").unwrap();
+    }
     source = re.replace_all(&source, "#[account($1)]").to_string();
 
     // Perform some simple regex-based transformations
