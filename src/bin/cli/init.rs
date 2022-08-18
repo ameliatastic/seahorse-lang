@@ -80,11 +80,11 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             if let Ok(version) = anchor {
                 let (major, minor, patch) = semver("anchor-cli (.+)", &version);
 
-                if (major, minor) < (0, 24) {
+                if (major, minor, patch) < (0, 24, 2) {
                     return Err(error_message(format!(
                         concat!(
-                            "Anchor (>=0.24.0) not found\n\n",
-                            "Seahorse depends on Anchor (>=0.24.0), found: {}.{}.{}"
+                            "Anchor (>=0.24.2) not found\n\n",
+                            "Seahorse depends on Anchor (>=0.24.2), found: {}.{}.{}"
                         ),
                         major, minor, patch
                     ))
