@@ -185,6 +185,7 @@ impl TransformPass {
     fn is_account_type(&self, ty: &Ty) -> bool {
         match ty {
             Ty::Signer
+            | Ty::UncheckedAccount
             | Ty::TokenAccount
             | Ty::TokenMint
             | Ty::AssociatedTokenAccount

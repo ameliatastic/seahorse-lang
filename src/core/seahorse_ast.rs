@@ -203,6 +203,7 @@ pub enum Ty {
     Union(Vec<Ty>),
     Pubkey,
     Signer,
+    UncheckedAccount,
     Empty(Box<Ty>),
     TokenAccount,
     TokenMint,
@@ -443,6 +444,7 @@ impl Ty {
             (
                 Self::Empty(..)
                 | Self::Signer
+                | Self::UncheckedAccount
                 | Self::TokenAccount
                 | Self::TokenMint
                 | Self::AssociatedTokenAccount,
@@ -528,6 +530,7 @@ impl Ty {
             Self::List(..)
             | Self::Array(..)
             | Self::Signer
+            | Self::UncheckedAccount
             | Self::Empty(..)
             | Self::TokenAccount
             | Self::TokenMint

@@ -507,6 +507,7 @@ impl TryFrom<Expression> for Ty {
                 "String" => Ty::String,
                 "Pubkey" => Ty::Pubkey,
                 "Signer" => Ty::Signer,
+                "UncheckedAccount" => Ty::UncheckedAccount,
                 "TokenAccount" => Ty::TokenAccount,
                 "TokenMint" => Ty::TokenMint,
                 "AssociatedTokenAccount" => Ty::AssociatedTokenAccount,

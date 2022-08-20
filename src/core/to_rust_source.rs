@@ -102,17 +102,21 @@ impl ToTokens for Account {
             },
             (ty, init) => {
                 let account_type = InAccounts(&account_type);
+                let doc_attr = match ty {
+                    &Ty::UncheckedAccount => quote! {
+                        #[doc="CHECK: This account is unchecked."]
+                    },
+                    _ => quote! {},
+                };
+                let account_attr = init
+                    .as_ref()
+                    .map(|x| x.to_token_stream())
+                    .unwrap_or_else(|| quote! { #[account(mut)]});
 
-                if let Some(init) = init {
-                    quote! {
-                        #init
-                        pub #name: #account_type
-                    }
-                } else {
-                    quote! {
-                        #[account(mut)]
-                        pub #name: #account_type
-                    }
+                quote! {
+                  #doc_attr
+                  #account_attr
+                  pub #name: #account_type
                 }
             }
         });
@@ -125,6 +129,7 @@ impl<'t> ToTokens for InAccounts<'t> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.0 {
             Ty::Signer => quote! { Signer<'info> },
+            Ty::UncheckedAccount => quote! { UncheckedAccount<'info> },
             Ty::TokenAccount => quote! { Box<Account<'info, token::TokenAccount>> },
             Ty::TokenMint => quote! { Box<Account<'info, token::Mint>> },
             Ty::AssociatedTokenAccount => quote! { Box<Account<'info, token::TokenAccount>> },
@@ -291,6 +296,7 @@ impl ToTokens for Ty {
                 quote! { Context<#name> }
             }
             Ty::Signer => quote! { Signer },
+            Ty::UncheckedAccount => quote! { UncheckedAccount },
             Ty::Empty(ty) => quote! { #ty },
             Ty::TokenAccount => quote! { token::TokenAccount },
             Ty::TokenMint => quote! { token::Mint },
