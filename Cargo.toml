@@ -2,7 +2,7 @@
 name = "seahorse-lang"
 version = "0.1.6"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "Write Anchor-compatible Solana programs in Python"
 homepage = "https://seahorse-lang.org/"
 repository = "https://github.com/ameliatastic/seahorse-lang/"
