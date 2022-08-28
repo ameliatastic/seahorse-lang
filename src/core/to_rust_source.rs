@@ -38,7 +38,7 @@ impl ToTokens for Def {
         tokens.extend(match self {
             Def::TyDef(def) if def.is_account() => account_token_stream(def),
             Def::TyDef(def) if def.is_enum() => quote! {
-                #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
+                #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq, Copy)]
                 #def
             },
             Def::TyDef(def) => quote! {
@@ -341,6 +341,11 @@ impl ToTokens for Ty {
                 quote! { Account<'_, #name> }
             }
             Ty::ExactDefined { name, .. } => {
+                let name = ident(&name);
+
+                quote! { #name }
+            }
+            Ty::Defined(name) => {
                 let name = ident(&name);
 
                 quote! { #name }
