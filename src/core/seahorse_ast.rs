@@ -49,6 +49,7 @@ pub enum TyDef {
     Enum {
         name: String,
         options: Vec<String>,
+        default: Option<String>,
     },
 }
 
@@ -692,7 +693,7 @@ impl TyDef {
 
                 None
             }
-            Self::Enum { name, options } => {
+            Self::Enum { name, options, .. } => {
                 for option in options.iter() {
                     if option.as_str() == attr {
                         return Some(Ty::ExactDefined {

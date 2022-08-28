@@ -2,7 +2,6 @@ mod from_python_ast;
 mod transform;
 
 use crate::core::{python_ast as py, seahorse_ast::*, CoreError};
-use from_python_ast::*;
 use transform::*;
 
 /// Convert a Python program into a Seahorse program

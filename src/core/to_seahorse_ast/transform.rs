@@ -1,9 +1,6 @@
 use crate::core::{python_ast::Location, seahorse_ast::*, CoreError};
 use heck::ToUpperCamelCase;
-use std::{
-    collections::{HashMap, HashSet},
-    mem::replace,
-};
+use std::{collections::HashMap, mem::replace};
 
 pub enum Error {
     NameReused(String),

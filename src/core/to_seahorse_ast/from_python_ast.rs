@@ -860,22 +860,33 @@ impl TryFrom<py::Statement> for Def {
                         Err(UnsupportedError::EnumAccount)
                     } else if is_enum {
                         let mut options = Vec::new();
+                        let mut default: Option<String> = None;
                         for statement in body.into_iter() {
-                            options.push(match statement {
+                            match statement {
                                 Statement::RawAssign {
                                     left: Expression::Id(name),
                                     ty: None,
+                                    right,
                                     ..
-                                } => name,
+                                } => {
+                                    if right == Some(Expression::Int(0)) {
+                                        default = Some(name.clone());
+                                    }
+                                    options.push(name);
+                                }
                                 _ => {
                                     return Err(UnsupportedError::EnumWithNonAssign
                                         .into_core()
                                         .located(location));
                                 }
-                            });
+                            }
                         }
 
-                        Ok(Def::TyDef(TyDef::Enum { name, options }))
+                        Ok(Def::TyDef(TyDef::Enum {
+                            name,
+                            options,
+                            default,
+                        }))
                     } else {
                         let mut fields = Vec::new();
                         for statement in body.into_iter() {

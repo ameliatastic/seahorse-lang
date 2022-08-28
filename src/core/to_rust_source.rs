@@ -208,6 +208,24 @@ impl ToTokens for AccountInit {
     }
 }
 
+fn enum_option_tokens(option: String, default: Option<&String>) -> TokenStream {
+    let label = ident(&option);
+
+    match default {
+        Some(s) if s == &option => {
+            quote! {
+                #[default]
+                #label
+            }
+        }
+        _ => {
+            quote! {
+                #label
+            }
+        }
+    }
+}
+
 impl ToTokens for TyDef {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
@@ -220,14 +238,28 @@ impl ToTokens for TyDef {
                     }
                 });
             }
-            TyDef::Enum { name, options } => {
+            TyDef::Enum {
+                name,
+                options,
+                default,
+            } => {
                 let name = ident(name);
-                let options = options.iter().map(|option| ident(option));
+                let has_default = default.is_some();
+
+                if has_default {
+                    tokens.extend(quote! {
+                        #[derive(Default)]
+                    })
+                }
+
+                let option_tokens = options
+                    .iter()
+                    .map(|option| enum_option_tokens(option.to_string(), default.as_ref()));
 
                 tokens.extend(quote! {
                     pub enum #name {
                         // #[default]
-                        #(#options),*
+                        #(#option_tokens),*
                     }
                 });
             }
@@ -878,6 +910,16 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
     }
 
     let mut tokens = TokenStream::new();
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        // This is technically a rust compiler version limitation, rather than wasm
+        // When compiling to wasm for Playground, we need to add #![feature(derive_default_enum)]
+        // But shouldn't include it on more recent versions of Rust
+        tokens.extend(quote! {
+        #![feature(derive_default_enum)]
+        })
+    }
 
     tokens.extend(quote! {
         use anchor_lang::prelude::*;
