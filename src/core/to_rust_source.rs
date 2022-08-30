@@ -172,9 +172,17 @@ impl ToTokens for AccountInit {
                     _ => panic!("Encountered an unexpected non-program account")
                 };
 
-                quote! {
-                    // #[account(init, payer = #payer, seeds = [#(#seeds),*], bump, space = 8 + std::mem::size_of::<#account_type>())]
-                    __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#seeds),*], bump, space = 8 + std::mem::size_of::<#account_type>()]]],
+                match seeds {
+                    Some(s) => 
+                        quote! {
+                            // #[account(init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>())]
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>()]]],
+                        },
+                    None => 
+                        quote! {
+                            // #[account(init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>())]
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>()]]],
+                        }
                 }
             }
             AccountInit::TokenAccount { payer, seeds, mint, authority } => {
@@ -182,8 +190,15 @@ impl ToTokens for AccountInit {
                 let mint = ident(mint);
                 let authority = ident(authority);
 
-                quote! {
-                    __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#seeds),*], bump, token::mint = #mint, token::authority = #authority]]],
+                match seeds {
+                    Some(s) => 
+                        quote! {
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#s),*], bump, token::mint = #mint, token::authority = #authority]]],
+                        },
+                    NONE => 
+                        quote! {
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, token::mint = #mint, token::authority = #authority]]],
+                        }
                 }
             },
             AccountInit::TokenMint { payer, seeds, decimals, authority } => {
@@ -191,8 +206,15 @@ impl ToTokens for AccountInit {
                 let decimals = Literal::u8_unsuffixed(*decimals);
                 let authority = ident(authority);
 
-                quote! {
-                    __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#seeds),*], bump, mint::decimals = #decimals, mint::authority = #authority]]],
+                match seeds {
+                    Some(s) =>
+                        quote! {
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#s),*], bump, mint::decimals = #decimals, mint::authority = #authority]]],
+                        },
+                    None =>
+                        quote! {
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, mint::decimals = #decimals, mint::authority = #authority]]],
+                        }
                 }
             },
             AccountInit::AssociatedTokenAccount { payer, mint, authority } => {
