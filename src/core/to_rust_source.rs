@@ -880,6 +880,10 @@ pub fn from_seahorse_ast(ast: Program, program_name: String) -> Result<String, C
     let mut tokens = TokenStream::new();
 
     tokens.extend(quote! {
+        #![allow(unused_imports)]
+        #![allow(unused_variables)]
+        #![allow(unused_mut)]
+
         use anchor_lang::prelude::*;
         use anchor_spl::token;
         use anchor_spl::associated_token;
