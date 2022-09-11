@@ -90,6 +90,7 @@ pub enum AccountInit {
         account_type: Ty,
         payer: String,
         seeds: Option<Vec<Expression>>,
+        strings_size: usize,
     },
     TokenAccount {
         payer: String,

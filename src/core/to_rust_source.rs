@@ -165,23 +165,24 @@ impl ToTokens for AccountInit {
         // Just gonna look the other way on that for now.
 
         tokens.extend(match self {
-            AccountInit::Program { account_type, payer, seeds } => {
+            AccountInit::Program { account_type, payer, seeds, strings_size } => {
                 let payer = ident(payer);
                 let account_type = match account_type {
                     Ty::ExactDefined { name, .. } => ident(&name),
                     _ => panic!("Encountered an unexpected non-program account")
                 };
+                let strings_size: Literal = Literal::usize_unsuffixed(*strings_size);
 
                 match seeds {
                     Some(s) => 
                         quote! {
-                            // #[account(init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>())]
-                            __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>()]]],
+                            // #[account(init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>() + strings_size)]
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, seeds = [#(#s),*], bump, space = 8 + std::mem::size_of::<#account_type>() + #strings_size]]],
                         },
                     None => 
                         quote! {
-                            // #[account(init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>())]
-                            __SEAHORSE_INIT__: account![[[init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>()]]],
+                            // #[account(init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>() + strings_size)]
+                            __SEAHORSE_INIT__: account![[[init, payer = #payer, space = 8 + std::mem::size_of::<#account_type>() + #strings_size]]],
                         }
                 }
             }
@@ -793,7 +794,7 @@ impl ToTokens for Expression {
                 #value
             },
             Expression::String(value) => quote! {
-                #value
+                #value.to_string()
             },
             Expression::Bool(value) => quote! {
                 #value

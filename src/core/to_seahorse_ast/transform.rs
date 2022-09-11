@@ -21,6 +21,7 @@ pub enum Error {
     CallWithTypeMismatch(String, Ty, Ty),
     CallWithArgMissing(String),
     CallWithInvalidArgs(Vec<Param>),
+    ExpectedToBeStruct(String),
 }
 
 impl From<Error> for CoreError {
@@ -133,7 +134,11 @@ impl From<Error> for CoreError {
                         (rc, oc) => format!("Help: this function has {} required args ({}) and {} optional args ({})", rc, required_params, oc, optional_params),
                     }
                 )
-            }
+            },
+            Error::ExpectedToBeStruct(name) => Self::make_raw(
+                format!("type {} was not a struct", name),
+                "Help: this is probably a bug in Seahorse",
+            )
         }
     }
 }
@@ -1640,12 +1645,12 @@ impl TransformPass {
                                 self.context.infer_token_program = true;
                                 self.context.infer_rent = true;
 
-                                AccountInit::TokenAccount {
+                                Ok(AccountInit::TokenAccount {
                                     payer,
                                     seeds,
                                     mint,
                                     authority,
-                                }
+                                })
                             }
                             Ty::TokenMint => {
                                 let mut args = self.transform_call_args(
@@ -1673,12 +1678,12 @@ impl TransformPass {
                                 self.context.infer_token_program = true;
                                 self.context.infer_rent = true;
 
-                                AccountInit::TokenMint {
+                                Ok(AccountInit::TokenMint {
                                     payer,
                                     seeds,
                                     decimals: decimals as u8,
                                     authority,
-                                }
+                                })
                             }
                             Ty::AssociatedTokenAccount => {
                                 let mut args = self.transform_call_args(
@@ -1699,39 +1704,66 @@ impl TransformPass {
                                 self.context.infer_associated_token_program = true;
                                 self.context.infer_rent = true;
 
-                                AccountInit::AssociatedTokenAccount {
+                                Ok(AccountInit::AssociatedTokenAccount {
                                     payer,
                                     mint,
                                     authority,
-                                }
+                                })
                             }
                             Ty::ExactDefined {
                                 name: acc, is_acc, ..
                             } if is_acc => {
-                                let mut args = self.transform_call_args(
-                                    args,
-                                    &vec![
-                                        Param::new("payer", Ty::Signer),
-                                        Param::new(
-                                            "seeds",
-                                            Ty::Array(Box::new(Ty::Any), TyParam::Any),
-                                        )
-                                        .optional(),
-                                    ],
-                                )?;
-                                let mut arg = move |name: &str| args.remove(name);
+                                let matching_struct = self.ty_defs.get(&acc);
+                                match matching_struct {
+                                    Some(TyDef::Struct { fields, .. }) => {
+                                        let strings_size =
+                                            fields.iter().fold(0, |acc, f| match f.ty {
+                                                /*
+                                                String is a vec, 4 byte prefix + up to 4 bytes per character
+                                                Note that this will be a slight over-estimate. We already do std::mem::size_of::<Account>
+                                                On my system this is 24 bytes. If we want to handle this, we can either hardcode -24 here
+                                                (but size of String depends on usize so that feels risky), or track how many strings there are
+                                                and subtract (num * std::mem::size_of::<String>) in to_rust_source
+                                                For now I think it's not worth adding that complexity though
+                                                */
+                                                Ty::StringLength(TyParam::Exact(len)) => {
+                                                    acc + 4 + (len * 4)
+                                                }
+                                                _ => acc,
+                                            });
 
-                                let payer = arg("payer").unwrap().as_id().unwrap();
-                                let seeds = arg("seeds")
-                                    .map(|s| self.transform_seeds(s.as_list().unwrap()).unwrap());
-                                AccountInit::Program {
-                                    account_type: Ty::ExactDefined {
-                                        name: acc,
-                                        is_mut: true,
-                                        is_acc: true,
-                                    },
-                                    payer,
-                                    seeds,
+                                        let mut args = self.transform_call_args(
+                                            args,
+                                            &vec![
+                                                Param::new("payer", Ty::Signer),
+                                                Param::new(
+                                                    "seeds",
+                                                    Ty::Array(Box::new(Ty::Any), TyParam::Any),
+                                                )
+                                                .optional(),
+                                            ],
+                                        )?;
+                                        let mut arg = move |name: &str| args.remove(name);
+
+                                        let payer = arg("payer").unwrap().as_id().unwrap();
+                                        let seeds = arg("seeds").map(|s| {
+                                            self.transform_seeds(s.as_list().unwrap()).unwrap()
+                                        });
+
+                                        Ok(AccountInit::Program {
+                                            account_type: Ty::ExactDefined {
+                                                name: acc,
+                                                is_mut: true,
+                                                is_acc: true,
+                                            },
+                                            payer,
+                                            seeds,
+                                            strings_size,
+                                        })
+                                    }
+                                    _ => Err(Error::ExpectedToBeStruct(name.clone())
+                                        .into_core()
+                                        .located(location)),
                                 }
                             }
                             ty => {
@@ -1739,10 +1771,15 @@ impl TransformPass {
                             }
                         };
 
-                        self.context.accounts.get_mut(index).unwrap().init = Some(init);
-                        self.context.infer_system_program = true;
+                        match init {
+                            Ok(init) => {
+                                self.context.accounts.get_mut(index).unwrap().init = Some(init);
+                                self.context.infer_system_program = true;
 
-                        Ok(Expression::Initialized { name })
+                                Ok(Expression::Initialized { name })
+                            }
+                            Err(err) => return Err(err),
+                        }
                     }
                     (ty, "transfer_lamports") if self.is_account_type(&ty) => {
                         let mut args = self.transform_call_args(
