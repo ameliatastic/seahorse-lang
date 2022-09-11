@@ -1113,7 +1113,7 @@ impl TransformPass {
                             Ty::Union(vec![
                                 // Ty::List(Box::new(Ty::Any)),
                                 Ty::Array(Box::new(Ty::Any), TyParam::Any),
-                                Ty::StringLength(TyParam::Any),
+                                Ty::StringOfLength(TyParam::Any),
                             ]),
                         )],
                     )?;
@@ -1128,7 +1128,7 @@ impl TransformPass {
                         Ty::Array(_, TyParam::Exact(len)) => Ok(Expression::Int(len as i64)),
                         // Note that we want string length to be computed dynamically at run-time,
                         // so we don't just return the max length here
-                        Ty::StringLength(_) => Ok(Expression::StringLength(Box::new(param))),
+                        Ty::StringOfLength(_) => Ok(Expression::StringLength(Box::new(param))),
                         _ => panic!("Unexpected type?"),
                     }
                 }
@@ -1731,7 +1731,7 @@ impl TransformPass {
                                                 and subtract (num * std::mem::size_of::<String>) in to_rust_source
                                                 For now I think it's not worth adding that complexity though
                                                 */
-                                                Ty::StringLength(TyParam::Exact(len)) => {
+                                                Ty::StringOfLength(TyParam::Exact(len)) => {
                                                     acc + 4 + (len * 4)
                                                 }
                                                 _ => acc,

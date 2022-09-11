@@ -533,7 +533,7 @@ impl TryFrom<Expression> for Ty {
                         _ => Err(UnsupportedError::ArrayTypeNotRecognized),
                     },
                     "String" => match index.as_int() {
-                        Some(len) => Ok(Self::StringLength(TyParam::Exact(len as usize))),
+                        Some(len) => Ok(Self::StringOfLength(TyParam::Exact(len as usize))),
                         _ => Err(UnsupportedError::StringTypeNotRecognized),
                     },
                     _ => Err(UnsupportedError::TypeNotRecognized),

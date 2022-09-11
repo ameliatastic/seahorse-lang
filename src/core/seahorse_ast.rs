@@ -196,7 +196,7 @@ pub enum Ty {
     Tuple(Vec<Ty>),
     List(Box<Ty>),
     Array(Box<Ty>, TyParam),
-    StringLength(TyParam),
+    StringOfLength(TyParam),
     Iter(Box<Ty>),
     Function {
         params: Vec<Param>,
@@ -331,7 +331,7 @@ pub enum Expression {
     RawFString {
         values: Vec<Expression>,
     },
-    StringLength(Box<Expression>)
+    StringLength(Box<Expression>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -507,7 +507,9 @@ impl Ty {
             }
             (Self::AssociatedTokenAccount, Self::TokenAccount) => true,
             (self_, Self::Union(opts)) => opts.iter().any(|opt| self_.fits_as(opt)),
-            (Self::StringLength(p_self), Self::StringLength(p_other)) => p_self.fits_as(p_other),
+            (Self::StringOfLength(p_self), Self::StringOfLength(p_other)) => {
+                p_self.fits_as(p_other)
+            }
             (_, Self::Any) => true,
             _ => self == other,
         }
