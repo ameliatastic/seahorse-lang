@@ -23,6 +23,7 @@ pub enum UnsupportedError {
     TypeNotRecognized,
     ListType,
     ArrayTypeNotRecognized,
+    StringTypeNotRecognized,
     TraitNotRecognized(String),
     TraitNotIdentifier,
     Await,
@@ -287,6 +288,10 @@ impl From<UnsupportedError> for CoreError {
                 "arbitrary top-level statements are not supported",
                 "Hint: if you're trying to write the body of your smart contract, you need to put it inside of an instruction:\n\n    @instruction\n    def instruction_name(arg: Type, account: AccountType, ...):\n        ..."
             ),
+            UnsupportedError::StringTypeNotRecognized => Self::make_raw(
+                "unsupported string type hint",
+                "Hint: string types have the following form: String[N] where N is an integer literal"
+            ),
         }
     }
 }
@@ -526,6 +531,10 @@ impl TryFrom<Expression> for Ty {
                             TyParam::Exact(len as usize),
                         )),
                         _ => Err(UnsupportedError::ArrayTypeNotRecognized),
+                    },
+                    "String" => match index.as_int() {
+                        Some(len) => Ok(Self::StringLength(TyParam::Exact(len as usize))),
+                        _ => Err(UnsupportedError::StringTypeNotRecognized),
                     },
                     _ => Err(UnsupportedError::TypeNotRecognized),
                 },

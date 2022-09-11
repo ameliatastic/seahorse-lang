@@ -195,6 +195,7 @@ pub enum Ty {
     Tuple(Vec<Ty>),
     List(Box<Ty>),
     Array(Box<Ty>, TyParam),
+    StringLength(TyParam),
     Iter(Box<Ty>),
     Function {
         params: Vec<Param>,
@@ -584,6 +585,14 @@ impl Expression {
     pub fn as_list(self) -> Option<Vec<Expression>> {
         match self {
             Expression::List(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_tuple1(self) -> Option<Self> {
+        println!("{:?}", self);
+        match self {
+            Expression::Tuple(mut value) if value.len() == 1 => Some(value.remove(0)),
             _ => None,
         }
     }
