@@ -226,6 +226,26 @@ class Enum:
     ```
     """
 
+class String([N]):
+    """A fixed-length unicode string of size N characters
+
+    This is used instead of `str`, so that it can be used on fields of accounts.
+    If an account contains a string of length N, then we need to add N to its size when we initialize it.
+    Note that this will include 4 bytes per character on the account.
+
+    Example:
+    ```
+    class MyString(Account):
+        the_string: String[20]
+
+    @instruction
+    def init_data(owner: Signer, my_string: Empty[MyString], initial_string: String[20]):
+        data = my_string.init(payer = owner)
+        data.the_string = initial_string
+    ```
+    """
+
+
 # ============
 # Solana types
 # ============
