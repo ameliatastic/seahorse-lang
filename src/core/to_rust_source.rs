@@ -804,6 +804,9 @@ impl ToTokens for Expression {
 
                 quote! { #name }
             }
+            Expression::StringLength(value) => quote! {
+                #value.chars().count()
+            },
             Expression::RawCall { .. } | Expression::RawFString { .. } => {
                 panic!("Encountered an unformattable expression")
             }

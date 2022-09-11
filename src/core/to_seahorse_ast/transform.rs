@@ -374,6 +374,7 @@ impl TransformPass {
                     Ty::Any
                 }
             }
+            Expression::StringLength(_) => Ty::U64,
             Expression::RawCall { .. } | Expression::RawFString { .. } => Ty::Never,
         };
 
@@ -1112,18 +1113,22 @@ impl TransformPass {
                             Ty::Union(vec![
                                 // Ty::List(Box::new(Ty::Any)),
                                 Ty::Array(Box::new(Ty::Any), TyParam::Any),
+                                Ty::StringLength(TyParam::Any),
                             ]),
                         )],
                     )?;
 
-                    let iter = arg_map.remove("0").unwrap();
-                    let ty = self.infer_type(&iter);
+                    let param = arg_map.remove("0").unwrap();
+                    let ty = self.infer_type(&param);
                     match ty {
                         // Ty::List(..) => Ok(Expression::As {
                         //     value: Box::new(iter.with_call("len", vec![])),
                         //     as_type: Ty::U64,
                         // }),
                         Ty::Array(_, TyParam::Exact(len)) => Ok(Expression::Int(len as i64)),
+                        // Note that we want string length to be computed dynamically at run-time,
+                        // so we don't just return the max length here
+                        Ty::StringLength(_) => Ok(Expression::StringLength(Box::new(param))),
                         _ => panic!("Unexpected type?"),
                     }
                 }
