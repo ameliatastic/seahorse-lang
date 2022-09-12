@@ -1622,7 +1622,8 @@ impl TransformPass {
                                         Param::new(
                                             "seeds",
                                             Ty::Array(Box::new(Ty::Any), TyParam::Any),
-                                        ),
+                                        )
+                                        .optional(),
                                         Param::new("mint", Ty::TokenMint),
                                         Param::new("authority", Ty::Any),
                                     ],
@@ -1630,8 +1631,9 @@ impl TransformPass {
                                 let mut arg = move |name: &str| args.remove(name).unwrap();
 
                                 let payer = arg("payer").as_id().unwrap();
-                                let seeds =
-                                    self.transform_seeds(arg("seeds").as_list().unwrap())?;
+                                let seeds = arg("seeds")
+                                    .as_list()
+                                    .map(|s| self.transform_seeds(s).unwrap());
                                 let mint = arg("mint").as_id().unwrap();
                                 let authority = arg("authority").as_id().unwrap();
 
@@ -1653,7 +1655,8 @@ impl TransformPass {
                                         Param::new(
                                             "seeds",
                                             Ty::Array(Box::new(Ty::Any), TyParam::Any),
-                                        ),
+                                        )
+                                        .optional(),
                                         Param::new("decimals", Ty::U8),
                                         Param::new("authority", Ty::Any),
                                     ],
@@ -1661,8 +1664,9 @@ impl TransformPass {
                                 let mut arg = move |name: &str| args.remove(name).unwrap();
 
                                 let payer = arg("payer").as_id().unwrap();
-                                let seeds =
-                                    self.transform_seeds(arg("seeds").as_list().unwrap())?;
+                                let seeds = arg("seeds")
+                                    .as_list()
+                                    .map(|s| self.transform_seeds(s).unwrap());
                                 let decimals = arg("decimals").as_int().unwrap();
                                 let authority = arg("authority").as_id().unwrap();
 
@@ -1711,15 +1715,15 @@ impl TransformPass {
                                         Param::new(
                                             "seeds",
                                             Ty::Array(Box::new(Ty::Any), TyParam::Any),
-                                        ),
+                                        )
+                                        .optional(),
                                     ],
                                 )?;
-                                let mut arg = move |name: &str| args.remove(name).unwrap();
+                                let mut arg = move |name: &str| args.remove(name);
 
-                                let payer = arg("payer").as_id().unwrap();
-                                let seeds =
-                                    self.transform_seeds(arg("seeds").as_list().unwrap())?;
-
+                                let payer = arg("payer").unwrap().as_id().unwrap();
+                                let seeds = arg("seeds")
+                                    .map(|s| self.transform_seeds(s.as_list().unwrap()).unwrap());
                                 AccountInit::Program {
                                     account_type: Ty::ExactDefined {
                                         name: acc,

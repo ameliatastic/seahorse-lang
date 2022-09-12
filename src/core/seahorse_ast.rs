@@ -89,17 +89,17 @@ pub enum AccountInit {
     Program {
         account_type: Ty,
         payer: String,
-        seeds: Vec<Expression>,
+        seeds: Option<Vec<Expression>>,
     },
     TokenAccount {
         payer: String,
-        seeds: Vec<Expression>,
+        seeds: Option<Vec<Expression>>,
         mint: String,
         authority: String,
     },
     TokenMint {
         payer: String,
-        seeds: Vec<Expression>,
+        seeds: Option<Vec<Expression>>,
         decimals: u8,
         authority: String,
     },
