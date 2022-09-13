@@ -197,6 +197,7 @@ pub enum Ty {
     List(Box<Ty>),
     Array(Box<Ty>, TyParam),
     StringOfLength(TyParam),
+    StringOfBytes(TyParam),
     Iter(Box<Ty>),
     Function {
         params: Vec<Param>,
@@ -510,6 +511,7 @@ impl Ty {
             (Self::StringOfLength(p_self), Self::StringOfLength(p_other)) => {
                 p_self.fits_as(p_other)
             }
+            (Self::StringOfBytes(p_self), Self::StringOfBytes(p_other)) => p_self.fits_as(p_other),
             (_, Self::Any) => true,
             _ => self == other,
         }

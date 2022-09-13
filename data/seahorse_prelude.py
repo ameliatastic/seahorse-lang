@@ -231,7 +231,9 @@ class String([N]):
 
     This is used instead of `str`, so that it can be used on fields of accounts.
     If an account contains a string of length N, then we need to add N to its size when we initialize it.
-    Note that this will include 4 bytes per character on the account.
+
+    Note that this will include 4 bytes per character on the account. You may prefer to use StringBytes[N]
+    instead if this is not appropriate.
 
     Example:
     ```
@@ -240,6 +242,25 @@ class String([N]):
 
     @instruction
     def init_data(owner: Signer, my_string: Empty[MyString], initial_string: String[20]):
+        data = my_string.init(payer = owner)
+        data.the_string = initial_string
+    ```
+    """
+
+class StringBytes([N]):
+    """A fixed-length string of size N bytes
+
+    This is used instead of `str`, so that it can be used on fields of accounts.
+    If an account contains a string of length N bytes, then we need to add N bytes to its size when we initialize it.
+
+    Example:
+
+    ```
+    class MyString(Account):
+        the_string: StringBytes[20]
+
+    @instruction
+    def init_data(owner: Signer, my_string: Empty[MyString], initial_string: StringBytes[20]):
         data = my_string.init(payer = owner)
         data.the_string = initial_string
     ```

@@ -307,6 +307,7 @@ impl ToTokens for Ty {
                 quote! { [#ty; #len] }
             }
             Ty::StringOfLength(_) => quote! { String },
+            Ty::StringOfBytes(_) => quote! { String },
             Ty::Pubkey => quote! { Pubkey },
             Ty::DefinedName(name) => {
                 let name = ident(&name);

@@ -1114,6 +1114,7 @@ impl TransformPass {
                                 // Ty::List(Box::new(Ty::Any)),
                                 Ty::Array(Box::new(Ty::Any), TyParam::Any),
                                 Ty::StringOfLength(TyParam::Any),
+                                Ty::StringOfBytes(TyParam::Any),
                             ]),
                         )],
                     )?;
@@ -1129,6 +1130,7 @@ impl TransformPass {
                         // Note that we want string length to be computed dynamically at run-time,
                         // so we don't just return the max length here
                         Ty::StringOfLength(_) => Ok(Expression::StringLength(Box::new(param))),
+                        Ty::StringOfBytes(_) => Ok(Expression::StringLength(Box::new(param))),
                         _ => panic!("Unexpected type?"),
                     }
                 }
@@ -1733,6 +1735,13 @@ impl TransformPass {
                                                 */
                                                 Ty::StringOfLength(TyParam::Exact(len)) => {
                                                     acc + 4 + (len * 4)
+                                                }
+                                                /*
+                                                Here we just add the 4-byte vec prefix to the stated size in bytes
+                                                The above note about over-estimation applies the same here
+                                                */
+                                                Ty::StringOfBytes(TyParam::Exact(bytes)) => {
+                                                    acc + 4 + bytes
                                                 }
                                                 _ => acc,
                                             });

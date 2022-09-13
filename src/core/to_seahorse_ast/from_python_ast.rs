@@ -24,6 +24,7 @@ pub enum UnsupportedError {
     ListType,
     ArrayTypeNotRecognized,
     StringTypeNotRecognized,
+    StringBytesTypeNotRecognized,
     TraitNotRecognized(String),
     TraitNotIdentifier,
     Await,
@@ -292,6 +293,10 @@ impl From<UnsupportedError> for CoreError {
                 "unsupported string type hint",
                 "Hint: string types have the following form: String[N] where N is an integer literal"
             ),
+            UnsupportedError::StringBytesTypeNotRecognized => Self::make_raw(
+                "unsupported StringBytes type hint",
+                "Hint: StringByte types have the following form: StringBytes[N] where N is an integer literal"
+            ),
         }
     }
 }
@@ -535,6 +540,10 @@ impl TryFrom<Expression> for Ty {
                     "String" => match index.as_int() {
                         Some(len) => Ok(Self::StringOfLength(TyParam::Exact(len as usize))),
                         _ => Err(UnsupportedError::StringTypeNotRecognized),
+                    },
+                    "StringBytes" => match index.as_int() {
+                        Some(len) => Ok(Self::StringOfBytes(TyParam::Exact(len as usize))),
+                        _ => Err(UnsupportedError::StringTypeNotRecognized), // TODO
                     },
                     _ => Err(UnsupportedError::TypeNotRecognized),
                 },
