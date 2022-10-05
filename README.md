@@ -55,7 +55,7 @@ def do_fizzbuzz(fizzbuzz: FizzBuzz, n: u64):
     fizzbuzz.n = 0
 ```
 
-This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://docs.seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
+This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
 
 The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](/src/core/README.md):
 
