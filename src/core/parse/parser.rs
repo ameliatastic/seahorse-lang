@@ -1,10 +1,10 @@
-use crate::core::{python_ast::*, CoreError};
+use crate::core::{parse::ast::*, CoreError};
 use rustpython_parser::{
     error::{ParseError, ParseErrorType},
     parser,
 };
 
-pub fn from_python_source(source: String) -> Result<Program, CoreError> {
+pub fn parse(source: String) -> Result<Program, CoreError> {
     let ast = parser::parse_program(&source).map_err(|error| {
         let ParseError { error, location } = error;
         match error {

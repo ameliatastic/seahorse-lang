@@ -1,12 +1,12 @@
 use crate::{
     cli::{util::*, SRC_PATH},
-    core::compile,
+    core::{compile, Tree},
 };
 use clap::Args;
 use owo_colors::OwoColorize;
 use std::{
     error::Error,
-    fs::File,
+    fs::{DirBuilder, File},
     io::{Read, Write},
     path::PathBuf,
     process::Command,
@@ -17,6 +17,27 @@ pub struct BuildArgs {
     /// Name of the program to build. By default, builds all programs
     #[clap(short = 'p', long)]
     program: Option<String>,
+}
+
+/// Write a source code tree to the filesystem.
+fn write_src_tree(tree: &Tree<String>, mut path: PathBuf) -> Result<(), Box<dyn Error>> {
+    match tree {
+        Tree::Node(node) => {
+            DirBuilder::new().recursive(true).create(&path)?;
+
+            for (name, tree) in node.iter() {
+                let path = path.join(name);
+                write_src_tree(tree, path)?;
+            }
+        }
+        Tree::Leaf(src) => {
+            path.set_extension("rs");
+            let mut output = File::create(path)?;
+            output.write_all(src.as_bytes())?;
+        }
+    }
+
+    return Ok(());
 }
 
 /// Build a single program.
@@ -48,26 +69,24 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
             let mut input = File::open(input_path)?;
             input.read_to_string(&mut py_src)?;
 
-            let rs_src = compile(py_src, program_name.clone())?;
+            let tree = compile(py_src, program_name.clone())?;
 
-            let output_path = project_path
+            let src = project_path
                 .join("programs")
                 .join(program_name.clone())
-                .join("src")
-                .join("lib.rs");
-            let mut output = File::create(output_path)?;
-            output.write_all(rs_src.as_bytes())?;
+                .join("src");
+
+            write_src_tree(&tree, src)?;
 
             let anchor_output = Command::new("anchor")
                 .args(["build", "-p", program_name.as_str()])
                 .output()?;
-            if !anchor_output.status.success() {
-                return Err(error_message(format!(
-                    "{} failed:\n{}",
-                    "anchor build",
-                    String::from_utf8(anchor_output.stderr)?
-                ))
-                .into());
+            let stderr = String::from_utf8(anchor_output.stderr)?;
+
+            if !anchor_output.status.success() || stderr.contains("error") {
+                return Err(
+                    error_message(format!("{} failed:\n{}", "anchor build", stderr)).into(),
+                );
             }
 
             return Ok(anchor_output.stdout);
