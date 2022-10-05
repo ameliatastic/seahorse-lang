@@ -55,4 +55,104 @@ def do_fizzbuzz(fizzbuzz: FizzBuzz, n: u64):
     fizzbuzz.n = 0
 ```
 
-This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
+This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://docs.seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
+
+The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](/src/core/README.md):
+
+```
+SEAHORSE CORE: THE COMPILER (v0.2.0)
+┌───────────────────────────────────────────┐
+│                                           │
+│ ┌───────────────────────────────────────┐ │
+│ │ PARSE                                 │ │
+│ │                                       │ │
+│ │ Turn Seahorse source code into Python │ │
+│ │ AST. Handled by rustpython.           │ │
+│ └───────────────────┬───────────────────┘ │
+│                     │                     │
+│                    AST                    │
+│                     │                     │
+│ ┌───────────────────▼───────────────────┐ │
+│ │ CLEAN                                 │ │
+│ │                                       │ │
+│ │ Remove unsupported parts from the AST │ │
+│ │ (like yields statements). Does some   │ │
+│ │ minor changes to make compilation     │ │
+│ │ easier.                               │ │
+│ └───────────────────┬───────────────────┘ │
+│                     │                     │
+│                    AST                    │
+│                     │                     │
+│ ┌───────────────────▼───────────────────┐ │
+│ │ PREPROCESS                            │ │
+│ │                                       │ │
+│ │ Find the source files for every       │ │
+│ │ import - recursively calls the first  │ │
+│ │ two steps as well.                    │ │
+│ │                                       │ │
+│ │ Outputs a "module registry" which has │ │
+│ │ every parsed+cleaned source file.     │ │
+│ └───────────────────┬───────────────────┘ │
+│                     │                     │
+│                  registry                 │
+│                     │                     │
+│ ┌───────────────────▼───────────────────┐ │
+│ │ COMPILE                               │ │
+│ │ ┌───────────────────────────────────┐ │ │
+│ │ │ NAMESPACE                         │ │ │
+│ │ │                                   │ │ │
+│ │ │ Resolve the location of every     │ │ │
+│ │ │ import/export in each module.     │ │ │
+│ │ └─────────────────┬─────────────────┘ │ │
+│ │                   │                   │ │
+│ │         registry & namespaces         │ │
+│ │                   │                   │ │
+│ │ ┌─────────────────▼─────────────────┐ │ │
+│ │ │ SIGN                              │ │ │
+│ │ │                                   │ │ │
+│ │ │ Find types of everything outside  │ │ │
+│ │ │ function bodies - class fields,   │ │ │
+│ │ │ function params/return type.      │ │ │
+│ │ └─────────────────┬─────────────────┘ │ │
+│ │                   │                   │ │
+│ │         registry & signatures         │ │
+│ │                   │                   │ │
+│ │ ┌─────────────────▼─────────────────┐ │ │
+│ │ │ CHECK                             │ │ │
+│ │ │                                   │ │ │
+│ │ │ Type check function bodies. Also  │ │ │
+│ │ │ outputs the type of each expres-  │ │ │
+│ │ │ sion, used for doing syntactic    │ │ │
+│ │ │ transformations later.            │ │ │
+│ │ └─────────────────┬─────────────────┘ │ │
+│ │                   │                   │ │
+│ │         registry & expr. types        │ │
+│ │                   │                   │ │
+│ │ ┌─────────────────▼─────────────────┐ │ │
+│ │ │ BUILD                             │ │ │
+│ │ │                                   │ │ │
+│ │ │ Turn the original Python AST into │ │ │
+│ │ │ a Rust-like AST, assisted by the  │ │ │
+│ │ │ type information from CHECK.      │ │ │
+│ │ │                                   │ │ │
+│ │ │ The new AST includes special      │ │ │
+│ │ │ constructs for things native to   │ │ │
+│ │ │ Anchor, like ix contexts.         │ │ │
+│ │ └───────────────────────────────────┘ │ │
+│ │                                       │ │
+│ └───────────────────┬───────────────────┘ │
+│                     │                     │
+│                    AST                    │
+│                     │                     │
+│ ┌───────────────────▼───────────────────┐ │
+│ │ GENERATE                              │ │
+│ │                                       │ │
+│ │ Finally, turn the Rust-like AST into  │ │
+│ │ Rust source code. Generates code for  │ │
+│ │ each source file individually, as     │ │
+│ │ well as a lib.rs that contains the    │ │
+│ │ "real" instruction entrypoints.       │ │
+│ └───────────────────────────────────────┘ │
+│                                           │
+└───────────────────────────────────────────┘
+```
