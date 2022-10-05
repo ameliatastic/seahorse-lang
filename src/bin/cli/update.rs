@@ -26,7 +26,7 @@ pub fn update(args: UpdateArgs) -> Result<(), Box<dyn Error>> {
     let root = project_root()?;
 
     with_spinner("Updating...", "Updated!", || {
-        update_prelude(root);
+        update_prelude(root)?;
 
         return Ok(());
     })?;

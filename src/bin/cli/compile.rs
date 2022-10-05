@@ -1,4 +1,7 @@
-use crate::{cli::util::*, core::compile as seahorse_compile};
+use crate::{
+    cli::util::*,
+    core::{compile as seahorse_compile, generate::GenerateOutput, Tree},
+};
 use clap::Args;
 use std::{
     error::Error,
@@ -16,6 +19,43 @@ pub struct CompileArgs {
     /// Output file. If not specified, writes to stdout
     #[clap(value_parser)]
     output_file: Option<String>,
+}
+
+/// Flatten a generated filetree into a single string with filename headers.
+fn flatten(tree: &GenerateOutput) -> String {
+    _flatten(tree, &mut vec![])
+}
+
+fn _flatten(tree: &GenerateOutput, path: &mut Vec<String>) -> String {
+    match tree {
+        Tree::Node(dir) => {
+            let mut cat = String::new();
+
+            // Order for consistent output
+            let mut parts = vec![];
+            for (name, tree) in dir.iter() {
+                path.push(name.clone());
+                parts.push((name.clone(), _flatten(tree, path)));
+                path.pop();
+            }
+
+            parts.sort();
+            for (_, text) in parts.into_iter() {
+                cat.push_str(text.as_str());
+            }
+
+            cat
+        }
+        Tree::Leaf(text) => {
+            let mut filename = path[0].clone();
+            for part in path.iter().skip(1) {
+                filename.push_str(format!("/{}", part).as_str());
+            }
+            filename.push_str(".rs");
+
+            format!("// ===== {} =====\n\n{}\n", filename, text)
+        }
+    }
 }
 
 pub fn compile(args: CompileArgs) -> Result<(), Box<dyn Error>> {
@@ -61,7 +101,7 @@ pub fn compile(args: CompileArgs) -> Result<(), Box<dyn Error>> {
 
     let rs_src = seahorse_compile(py_src, program_name)?;
 
-    output.write_all(rs_src.as_bytes())?;
+    output.write_all(flatten(&rs_src).as_bytes())?;
 
     Ok(())
 }
