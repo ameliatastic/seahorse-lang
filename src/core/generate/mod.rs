@@ -35,6 +35,10 @@ impl ToTokens for Artifact {
         } = self;
 
         tokens.extend(quote! {
+            #![allow(unused_imports)]
+            #![allow(unused_variables)]
+            #![allow(unused_mut)]
+            
             // Default imports
             use crate::{assign, index_assign, seahorse_util::*};
             use std::{rc::Rc, cell::RefCell};
@@ -1276,6 +1280,12 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
         add_mods(&mut tree);
 
         if let Tree::Node(node) = &mut tree {
+            let allows = concat!(
+                "#![allow(unused_imports)]\n",
+                "#![allow(unused_variables)]\n",
+                "#![allow(unused_mut)]\n"
+            );
+
             let mod_text = match node.remove("mod") {
                 Some(Tree::Leaf(text)) => text,
                 _ => panic!(),
@@ -1283,7 +1293,7 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
 
             node.insert(
                 "lib".to_string(),
-                Tree::Leaf(format!("{}\n{}", mod_text, lib)),
+                Tree::Leaf(format!("{}\n{}\n{}", allows, mod_text, lib)),
             );
         }
 

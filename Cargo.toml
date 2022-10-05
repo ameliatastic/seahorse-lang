@@ -1,8 +1,8 @@
 [package]
 name = "seahorse-lang"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
-license = "Apache-2.0"
+license = "MIT"
 description = "Write Anchor-compatible Solana programs in Python"
 homepage = "https://seahorse-lang.org/"
 repository = "https://github.com/ameliatastic/seahorse-lang/"
@@ -24,9 +24,7 @@ owo-colors = "3.4.0"
 proc-macro2 = "1.0.40"
 quote = "1.0.20"
 regex = "1.5.6"
+rustfmt-wrapper = "0.2.0"
 rustpython-parser = "0.1.2"
 spinners = "4.1.0"
 toml_edit = "0.14.4"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rustfmt-wrapper = "0.2.0"
