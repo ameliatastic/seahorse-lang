@@ -1122,7 +1122,7 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         ty.clone().into(),
                         Transformation::new(|mut expr| {
-                            let obj = expr.obj;
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.to_le_bytes().as_ref()
                             });
@@ -1160,7 +1160,7 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         ty.clone().into(),
                         Transformation::new(|mut expr| {
-                            let obj = expr.obj;
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.key().as_ref()
                             });
@@ -1181,7 +1181,7 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         ty.clone().into(),
                         Transformation::new(|mut expr| {
-                            let obj = expr.obj;
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.key().as_ref()
                             });
@@ -1201,7 +1201,7 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         ty.clone().into(),
                         Transformation::new(|mut expr| {
-                            let obj = expr.obj;
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.key().as_ref()
                             });
@@ -1221,7 +1221,8 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         ty.clone().into(),
                         Transformation::new(|mut expr| {
-                            let obj = expr.obj;
+                            // Remove the borrows from the account, then return immediately
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.key().as_ref()
                             });

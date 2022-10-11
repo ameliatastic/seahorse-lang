@@ -694,7 +694,7 @@ impl BuiltinSource for Python {
 
                             let list = match expr.obj {
                                 ExpressionObj::Mutable(obj) => match obj.obj {
-                                    ExpressionObj::Vec(list) => list,
+                                    ExpressionObj::Vec(list) => list.into_iter().map(|element| element.without_borrows()),
                                     _ => {
                                         return Err(err);
                                     }
@@ -721,8 +721,7 @@ impl BuiltinSource for Python {
                         Ty::prelude(Prelude::Seed, vec![]).into(),
                         Transformation::new(|mut expr| {
                             // TODO maybe limit to only string literals?
-                            // would break if a string is passed as a parameter though, not sure what to do there
-                            let obj = expr.obj;
+                            let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.as_bytes().as_ref()
                             });
