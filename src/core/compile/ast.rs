@@ -283,6 +283,13 @@ impl TypedExpression {
             _ => Some(self),
         }
     }
+
+    /// Remove the borrows from this expression.
+    pub fn without_borrows(mut self) -> Self {
+        self.obj = self.obj.without_borrows();
+
+        return self;
+    }
 }
 
 impl From<ExpressionObj> for TypedExpression {
@@ -372,6 +379,65 @@ impl ExpressionObj {
             }
             .into(),
             args,
+        }
+    }
+
+    pub fn without_borrows(self) -> Self {
+        match self {
+            Self::BinOp { left, op, right } => Self::BinOp {
+                left: left.without_borrows().into(),
+                op,
+                right: right.without_borrows().into()
+            },
+            Self::Index { value, index } => Self::Index {
+                value: value.without_borrows().into(),
+                index: index.without_borrows().into(),
+            },
+            Self::TupleIndex { tuple, index } => Self::TupleIndex {
+                tuple: tuple.without_borrows().into(),
+                index
+            },
+            Self::UnOp { op, value } => Self::UnOp {
+                op,
+                value: value.without_borrows().into()
+            },
+            Self::Attribute { value, name } => Self::Attribute {
+                value: value.without_borrows().into(),
+                name
+            },
+            Self::StaticAttribute { value, name } => Self::StaticAttribute {
+                value: value.without_borrows().into(),
+                name
+            },
+            Self::Call { function, args } => Self::Call {
+                function: function.without_borrows().into(),
+                args: args.into_iter().map(|arg| arg.without_borrows()).collect()
+            },
+            Self::Ternary { cond, body, orelse } => Self::Ternary {
+                cond: cond.without_borrows().into(),
+                body: body.without_borrows().into(),
+                orelse: orelse.without_borrows().into()
+            },
+            Self::As { value, ty } => Self::As {
+                value: value.without_borrows().into(),
+                ty
+            },
+            Self::Vec(elements) => Self::Vec(
+                elements.into_iter().map(|element| element.without_borrows()).collect()
+            ),
+            Self::Array(elements) => Self::Array(
+                elements.into_iter().map(|element| element.without_borrows()).collect()
+            ),
+            Self::Tuple(elements) => Self::Tuple(
+                elements.into_iter().map(|element| element.without_borrows()).collect()
+            ),
+            Self::Ref(value) => Self::Ref(value.without_borrows().into()),
+            Self::Move(value) => Self::Move(value.without_borrows().into()),
+            Self::BorrowMut(value) | Self::BorrowImmut(value) => value.without_borrows().obj,
+            Self::Mutable(value) => Self::Mutable(value.without_borrows().into()),
+            // Deliberately skipping `Block` for now, there's no good way to map the body of a
+            // block to a body with no borrows
+            obj => obj
         }
     }
 }

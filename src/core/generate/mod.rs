@@ -5,6 +5,7 @@ use crate::{
 use proc_macro2::{Ident, Literal as PM2Literal, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
+#[cfg(not(target_arch = "wasm32"))]
 use rustfmt_wrapper::{config::*, rustfmt_config, Error as RustfmtError};
 
 use super::compile::builtin::prelude::MethodType;
@@ -1365,8 +1366,10 @@ fn add_mods(tree: &mut Tree<String>) {
     }
 }
 
+// Rustfmt isn't supported for wasm
+#[cfg(not(target_arch = "wasm32"))]
 /// Make a `TokenStream` look nice.
-fn beautify(tokens: TokenStream) -> CResult<String> {
+fn beautify_impl(tokens: TokenStream) -> CResult<String> {
     let config = Config {
         // Maybe there will be something here one day
         ..Config::default()
@@ -1416,6 +1419,17 @@ fn beautify(tokens: TokenStream) -> CResult<String> {
     source = re.replace_all(&source, "\n\n").to_string();
 
     return Ok(source);
+}
+
+fn beautify(tokens: TokenStream) -> CResult<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        return beautify_impl(tokens);
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        return Ok(tokens.to_string());
+    }
 }
 
 impl TryFrom<(BuildOutput, String)> for GenerateOutput {
