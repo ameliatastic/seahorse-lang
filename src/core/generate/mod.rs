@@ -209,7 +209,7 @@ impl ToTokens for Struct {
 
 impl ToTokens for Account {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { name, fields } = self;
+        let Self { name, fields, methods } = self;
 
         let account_name = ident(name);
         let loaded_name = ident(&format!("Loaded{}", name));
@@ -266,6 +266,32 @@ impl ToTokens for Account {
             }
         });
 
+        let mut instance_methods = vec![];
+        let mut static_methods = vec![];
+
+        for (method_type, func) in methods.iter() {
+            match method_type {
+                MethodType::Instance => {
+                    let method = InstanceMethod(func);
+
+                    instance_methods.push(quote! { #method });
+                }
+                MethodType::Static => {
+                    static_methods.push(quote! { #func });
+                }
+            }
+        }
+
+        // Like regular structs, split up the instance methods and static methods: each instance
+        // method of an account will belong to an `impl Mutable<LoadedAccount<'_, '_>>` block, and
+        // the static methods will belong to the original `impl Account` block.
+
+        let instance_impl = if instance_methods.len() > 0 {
+            Some(quote! { impl Mutable<#loaded_name<'_, '_>> { #(#instance_methods)* } })
+        } else {
+            None
+        };
+
         tokens.extend(quote! {
             #[account]
             #[derive(Debug)]
@@ -285,6 +311,8 @@ impl ToTokens for Account {
                     let mut loaded = loaded.borrow_mut();
                     #(#store_fields)*
                 }
+
+                #(#static_methods)*
             }
 
             #[derive(Debug)]
@@ -293,6 +321,8 @@ impl ToTokens for Account {
                 pub __programs__: &'entrypoint ProgramsMap<'info>,
                 #(#loaded_fields),*
             }
+
+            #instance_impl
         });
     }
 }

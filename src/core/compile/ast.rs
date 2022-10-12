@@ -55,6 +55,7 @@ pub struct Account {
     pub name: String,
     // Save type info for generation later
     pub fields: Vec<(String, TyExpr, Ty)>,
+    pub methods: Vec<(MethodType, Function)>,
 }
 
 /// An `enum` definition.

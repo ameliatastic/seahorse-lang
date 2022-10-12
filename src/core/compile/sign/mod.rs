@@ -50,7 +50,7 @@ impl Error {
             ),
             Self::AccountConstructor => CoreError::make_raw(
                 "accounts may not have constructors",
-                "Help: new accounts may only be created with a call to Empty.init()."
+                "Help: new accounts must be created through the Solana system program, try using the Empty.init(...) syntax instead."
             )
         }
         .located(loc.clone())
@@ -333,6 +333,15 @@ fn build_signature(
                             ..
                         }) => {
                             if params.is_instance_method {
+                                if name == "__init__" {
+                                    if is_account {
+                                        return Err(Error::AccountConstructor.core(loc));
+                                    }
+                                    if returns.is_some() {
+                                        return Err(Error::InvalidClassConstructor.core(loc));
+                                    }
+                                }
+
                                 methods.insert(
                                     name.clone(),
                                     (
@@ -341,6 +350,10 @@ fn build_signature(
                                     ),
                                 );
                             } else {
+                                if name == "__init__" {
+                                    return Err(Error::InvalidClassConstructor.core(loc));
+                                }
+
                                 methods.insert(
                                     name.clone(),
                                     (
