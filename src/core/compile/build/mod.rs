@@ -1007,8 +1007,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
                             match item {
                                 Item::Builtin(..) => {}
                                 Item::Defined(defined) => {
-                                    let context = contexts.remove(&name).unwrap();
-                                    let signature = signatures.remove(&name).unwrap();
+                                    let mut context = contexts.remove(&name).unwrap();
+                                    let mut signature = signatures.remove(&name).unwrap();
 
                                     match defined {
                                         Located(
@@ -1021,41 +1021,70 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                         ) => match signature {
                                             Signature::Class(ClassSignature::Struct(
                                                 StructSignature {
-                                                    is_account, mut fields, ..
+                                                    is_account, fields: mut fields_map, methods: mut methods_map, ..
                                                 },
                                             )) => {
                                                 let type_def = if is_account {
                                                     let account = Account {
                                                         name: name.clone(),
-                                                        fields: body.into_iter().map(|statement| match statement.1 {
+                                                        fields: body.into_iter().filter_map(|statement| match statement.1 {
                                                             ast::ClassDefStatementObj::FieldDef { name, ty: Some(ty_expr), .. } => {
-                                                                let ty = fields.remove(&name).unwrap();
-                                                                (
+                                                                let ty = fields_map.remove(&name).unwrap();
+                                                                Some((
                                                                     name,
                                                                     make_ty_expr(ty_expr, ty.clone()),
                                                                     ty
-                                                                )
+                                                                ))
                                                             },
-                                                            _ => panic!()
+                                                            _ => None
                                                         })
                                                         .collect()
                                                     };
 
                                                     TypeDef::Account(account)
                                                 } else {
-                                                    TypeDef::Struct(Struct {
-                                                        name,
-                                                        fields: body.into_iter().map(|statement| match statement.1 {
+                                                    let mut fields = vec![];
+                                                    let mut methods = vec![];
+                                                    let mut constructor = None;
+
+                                                    for Located(_, statement) in body.into_iter() {
+                                                        match statement {
                                                             ast::ClassDefStatementObj::FieldDef { name, ty: Some(ty_expr), .. } => {
-                                                                let ty = fields.remove(&name).unwrap();
-                                                                (
+                                                                let ty = fields_map.remove(&name).unwrap();
+                                                                fields.push((
                                                                     name,
                                                                     make_ty_expr(ty_expr, ty),
-                                                                )
+                                                                ));
                                                             },
-                                                            _ => panic!()
-                                                        })
-                                                        .collect()
+                                                            ast::ClassDefStatementObj::MethodDef(func) => {
+                                                                let typecheck = match1!(context, FinalContext::Class(ref mut typechecks) => typechecks.remove(&func.name).unwrap());
+
+                                                                let mut context = Context {
+                                                                    check_output: &check_output,
+                                                                    abs: &path,
+                                                                    ix_context: None,
+                                                                    directives: None,
+                                                                    expr_order: typecheck.expr_order.into(),
+                                                                    assign_order: typecheck.assign_order.into(),
+                                                                };
+                                                                let (method_type, signature) = methods_map.remove(&func.name).unwrap();
+                                                                let func = context.build_func(func, signature)?;
+
+                                                                if &func.name == "__init__" {
+                                                                    constructor = Some(func);
+                                                                } else {
+                                                                    methods.push((method_type, func));
+                                                                }
+                                                            },
+                                                            _ => {}
+                                                        }
+                                                    }
+
+                                                    TypeDef::Struct(Struct {
+                                                        name,
+                                                        fields,
+                                                        methods,
+                                                        constructor
                                                     })
                                                 };
 

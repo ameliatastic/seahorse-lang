@@ -320,6 +320,34 @@ impl TryInto<ClassDefStatement> for py::Statement {
                 }),
                 _ => Err(Error::ArbitraryClassDefStatement),
             },
+            py::StatementType::FunctionDef {
+                is_async,
+                name,
+                args,
+                body,
+                decorator_list,
+                returns,
+            } => {
+                if is_async {
+                    Err(Error::Async)
+                } else {
+                    Ok(ClassDefStatementObj::MethodDef(FunctionDef {
+                        name,
+                        params: (*args)
+                            .try_into()
+                            .map_err(|err: CoreError| err.located(location))?,
+                        body: body
+                            .into_iter()
+                            .map(|statement| statement.try_into())
+                            .collect::<Result<Vec<_>, CoreError>>()?,
+                        decorator_list: decorator_list
+                            .into_iter()
+                            .map(|decorator| decorator.try_into())
+                            .collect::<Result<Vec<_>, CoreError>>()?,
+                        returns: returns.map(|returns| returns.try_into()).transpose()?,
+                    }))
+                }
+            }
             _ => Err(Error::ArbitraryClassDefStatement),
         }
         .map(|ok| Located(location, ok))
@@ -340,10 +368,19 @@ impl TryInto<Params> for py::Parameters {
         {
             Err(Error::ArbitraryParams.core())
         } else {
+            let mut is_instance_method = false;
+            if let Some(arg) = self.args.get(0) {
+                if arg.annotation == None && &arg.arg == "self" {
+                    is_instance_method = true;
+                }
+            }
+
             Ok(Params {
+                is_instance_method,
                 params: self
                     .args
                     .into_iter()
+                    .skip(if is_instance_method { 1 } else { 0 })
                     .map(|arg| arg.try_into())
                     .collect::<Result<_, CoreError>>()?,
             })

@@ -51,7 +51,7 @@ pub enum ClassDefStatementObj {
         ty: Option<TyExpression>,
         value: Option<Expression>,
     },
-    // MethodDef(FunctionDef)
+    MethodDef(FunctionDef),
 }
 
 /// A function definition.
@@ -69,7 +69,7 @@ pub struct FunctionDef {
 /// Parameters for a function definition.
 #[derive(Clone, Debug)]
 pub struct Params {
-    // Leaving this open for later when more Pythonic support is added
+    pub is_instance_method: bool,
     pub params: Vec<Param>,
 }
 
