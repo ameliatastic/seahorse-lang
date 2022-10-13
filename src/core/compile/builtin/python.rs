@@ -576,7 +576,7 @@ impl BuiltinSource for Python {
                             let value = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
 
                             expr.obj = ExpressionObj::Rendered(quote! {
-                                #value.push(#(#args),*)
+                                #value.borrow_mut().push(#(#args),*)
                             });
 
                             Ok(Transformed::Expression(expr))
