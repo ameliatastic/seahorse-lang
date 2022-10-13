@@ -41,4 +41,4 @@ def do_operation(owner: Signer, calculator: Calculator, op: Operation, num: i64)
   elif op == Operation.MUL:
     calculator.display *= num
   elif op == Operation.DIV:
-    calculator.display /= num
+    calculator.display //= num
