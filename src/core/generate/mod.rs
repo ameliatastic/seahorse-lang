@@ -198,7 +198,7 @@ impl ToTokens for Struct {
         };
 
         tokens.extend(quote! {
-            #[derive(Clone, Debug, Default, AnchorSerialize, AnchorDeserialize)]
+            #[derive(Clone, Debug, Default)]
             pub struct #name { #(#fields),* }
 
             #instance_impl
@@ -1212,6 +1212,13 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 }
             }
 
+            impl <T: Default> Default for Mutable<T> {
+                fn default() -> Self {
+                    Self::new(T::default())
+                }
+            }
+
+            // Pythonic indexing for vec/array types (Seahorse List, Array types)
             impl<T: Clone> Mutable<Vec<T>> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
                     if index > 0 {
@@ -1223,7 +1230,6 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 }
             }
 
-            // TODO const generics allowed here?
             impl<T: Clone, const N: usize> Mutable<[T; N]> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
                     if index > 0 {
