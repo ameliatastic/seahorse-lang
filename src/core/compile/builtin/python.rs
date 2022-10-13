@@ -592,7 +592,12 @@ impl BuiltinSource for Python {
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
                         Transformation::new(|mut expr| {
-                            expr.obj = expr.obj.with_call("unwrap", vec![]);
+                            let function = match1!(expr.obj, ExpressionObj::Call { function, .. } => *function);
+                            let value = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #value.borrow_mut().pop().unwrap()
+                            });
 
                             Ok(Transformed::Expression(expr))
                         }),
