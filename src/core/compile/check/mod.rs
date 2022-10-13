@@ -31,6 +31,7 @@ enum Error {
     IsNotTarget,
     Unification(Ty, Ty),
     UnificationBase(TyName, TyName),
+    UnificationTyParams(TyName, usize, usize),
     UnificationFunctionParams(usize),
     UnificationCast(Ty, Ty),
     UnificationBiCast(Ty, Ty),
@@ -80,6 +81,9 @@ impl Error {
             }
             Self::UnificationBase(x, y) => {
                 CoreError::make_raw(format!("type mismatch - expected an instance of {}, found an instance of {}", x, y), "")
+            }
+            Self::UnificationTyParams(x, n, m) => {
+                CoreError::make_raw(format!("type mismatch - expected an instance of {} with {} type parameters, found an instance with {} type parameters", x, n, m), "")
             }
             Self::UnificationFunctionParams(required) => {
                 CoreError::make_raw(format!("type mismatch - expected a function that takes {} args", required), "")
@@ -541,12 +545,14 @@ impl<'a> Context<'a> {
     /// Typecheck a function from start to finish.
     fn typecheck_func(
         func: &ast::FunctionDef,
+        signature: &FunctionSignature,
         sign_output: &'a SignOutput,
         abs: &'a Vec<String>,
+        this: Option<Ty>,
     ) -> CResult<TypecheckOutput> {
         let mut context = Self::new(sign_output, abs);
 
-        context.check_func(func)?;
+        context.check_func(func, signature, this)?;
 
         return Ok(context.into());
     }
@@ -771,7 +777,7 @@ impl<'a> Context<'a> {
                                 )
                             )
                         )),
-                        _ => None
+                        _ => self.defined_attr(&path, attr)
                     }
                 })
             },
@@ -807,11 +813,17 @@ impl<'a> Context<'a> {
                                 Ty::Anonymous(0),
                                 Ty::Type(TyName::Defined(abs, DefinedType::Account), None),
                             )),
-                            Some(Signature::Class(ClassSignature::Struct(StructSignature {
+                            Some(Signature::Class(ClassSignature::Struct(sig @ StructSignature {
                                 is_account: false,
                                 ..
                             }))) => {
-                                Some((Ty::Anonymous(0), Ty::Type(TyName::Defined(abs, DefinedType::Struct), None)))
+                                Some((
+                                    Ty::Anonymous(0),
+                                    Ty::Type(
+                                        TyName::Defined(abs.clone(), DefinedType::Struct),
+                                        sig.constructor(TyName::Defined(abs, DefinedType::Struct))
+                                    )
+                                ))
                             }
                             Some(Signature::Class(ClassSignature::Enum(..))) => {
                                 Some((Ty::Anonymous(0), Ty::Type(TyName::Defined(abs, DefinedType::Enum), None)))
@@ -855,6 +867,13 @@ impl<'a> Context<'a> {
             Signature::Class(ClassSignature::Struct(sig)) => {
                 if sig.fields.contains_key(attr) {
                     Some((Ty::Anonymous(0), sig.fields.get(attr).unwrap().clone()))
+                } else if let Some((MethodType::Instance, FunctionSignature { params, returns })) =
+                    sig.methods.get(attr)
+                {
+                    Some((
+                        Ty::Anonymous(0),
+                        Ty::Function(params.clone(), returns.clone().into()),
+                    ))
                 } else {
                     let mut attr_ty = None;
                     for base in sig.bases.iter() {
@@ -878,7 +897,18 @@ impl<'a> Context<'a> {
             .tree
             .get_leaf_ext(path)
             .and_then(|signature| match signature {
-                Signature::Class(ClassSignature::Struct(sig)) => todo!(),
+                Signature::Class(ClassSignature::Struct(sig)) => {
+                    if let Some((MethodType::Static, FunctionSignature { params, returns })) =
+                        sig.methods.get(attr)
+                    {
+                        Some((
+                            Ty::Anonymous(0),
+                            Ty::Function(params.clone(), returns.clone().into()),
+                        ))
+                    } else {
+                        None
+                    }
+                }
                 Signature::Class(ClassSignature::Enum(EnumSignature { variants })) => {
                     if variants.contains_key(attr) {
                         Some((
@@ -897,42 +927,41 @@ impl<'a> Context<'a> {
     }
 
     /// Typecheck a function.
-    fn check_func(&mut self, func: &ast::FunctionDef) -> CResult<()> {
+    fn check_func(
+        &mut self,
+        func: &ast::FunctionDef,
+        signature: &FunctionSignature,
+        this: Option<Ty>,
+    ) -> CResult<()> {
         let ast::FunctionDef {
-            name,
             body,
             decorator_list,
             ..
         } = func;
-        match &self
-            .sign_output
-            .tree
-            .get_leaf(self.abs)
-            .unwrap()
-            .get(name)
-            .unwrap()
-        {
-            Signature::Function(FunctionSignature {
-                params, returns, ..
-            }) => {
-                for decorator in decorator_list.iter() {
-                    let i = self.free();
-                    self.check_expr(Ty::Param(i), decorator)?;
-                }
 
-                let mut scope = HashMap::new();
-                for (name, t, ..) in params.iter() {
-                    let i = self.new_ty(t.clone());
-                    scope.insert(name.clone(), i);
-                }
+        let FunctionSignature {
+            params, returns, ..
+        } = signature;
 
-                let i = self.new_ty(returns.clone());
-                self.returns = i;
-
-                self.check_block(body, Some(scope))?;
-            }
-            _ => panic!(),
+        for decorator in decorator_list.iter() {
+            let i = self.free();
+            self.check_expr(Ty::Param(i), decorator)?;
         }
+
+        let mut scope = HashMap::new();
+        if let Some(ty) = this {
+            let i = self.new_ty(ty);
+            scope.insert("self".to_string(), i);
+        }
+        for (name, t, ..) in params.iter() {
+            let i = self.new_ty(t.clone());
+            scope.insert(name.clone(), i);
+        }
+
+        let i = self.new_ty(returns.clone());
+        self.returns = i;
+
+        self.check_block(body, Some(scope))?;
 
         return Ok(());
     }
@@ -1350,14 +1379,14 @@ impl<'a> Context<'a> {
                                     loc,
                                 )?,
                                 Some(Signature::Class(ClassSignature::Struct(
-                                    StructSignature {
+                                    sig @ StructSignature {
                                         is_account: false, ..
                                     },
                                 ))) => self.unify(
                                     expr_ty,
                                     Ty::Type(
                                         TyName::Defined(path.clone(), DefinedType::Struct),
-                                        None,
+                                        sig.constructor(TyName::Defined(path.clone(), DefinedType::Struct)),
                                     ),
                                     loc,
                                 )?,
@@ -1404,12 +1433,16 @@ impl<'a> Context<'a> {
                                 Ty::Type(TyName::Defined(path.clone(), DefinedType::Account), None),
                                 loc,
                             )?,
-                            Some(Signature::Class(ClassSignature::Struct(StructSignature {
-                                is_account: false,
-                                ..
-                            }))) => self.unify(
+                            Some(Signature::Class(ClassSignature::Struct(
+                                sig @ StructSignature {
+                                    is_account: false, ..
+                                },
+                            ))) => self.unify(
                                 expr_ty,
-                                Ty::Type(TyName::Defined(path.clone(), DefinedType::Struct), None),
+                                Ty::Type(
+                                    TyName::Defined(path.clone(), DefinedType::Struct),
+                                    sig.constructor(TyName::Defined(path.clone(), DefinedType::Struct)),
+                                ),
                                 loc,
                             )?,
                             Some(Signature::Class(ClassSignature::Enum(..))) => self.unify(
@@ -1880,8 +1913,11 @@ impl<'a> Context<'a> {
             (t, Ty::Never) => Ok(t),
             // Match generics
             (Ty::Generic(x, a), Ty::Generic(y, b)) => {
-                if x != y || a.len() != b.len() {
+                if x != y {
                     return Err(Error::UnificationBase(x, y).core(loc));
+                }
+                if a.len() != b.len() {
+                    return Err(Error::UnificationTyParams(x, a.len(), b.len()).core(loc));
                 }
 
                 let a = a
@@ -2005,11 +2041,54 @@ impl TryFrom<SignOutput> for CheckOutput {
                     match def {
                         Export::Item(Item::Defined(Located(_, def))) => match def {
                             ast::TopLevelStatementObj::FunctionDef(func) => {
-                                let output = Context::typecheck_func(func, &sign_output, path)?;
+                                let signature = sign_output
+                                    .tree
+                                    .get_leaf(path)
+                                    .unwrap()
+                                    .get(&func.name)
+                                    .unwrap();
+                                let signature = match1!(signature, Signature::Function(signature) => signature);
+
+                                let output = Context::typecheck_func(func, signature, &sign_output, path, None)?;
                                 checked.insert(func.name.clone(), FinalContext::Function(output));
                             }
-                            ast::TopLevelStatementObj::ClassDef { name, .. } => {
-                                checked.insert(name.clone(), FinalContext::Class(HashMap::new()));
+                            ast::TopLevelStatementObj::ClassDef { name, body, .. } => {
+                                let mut methods = HashMap::new();
+
+                                for Located(_, statement) in body.iter() {
+                                    match statement {
+                                        ast::ClassDefStatementObj::MethodDef(func) => {
+                                            let class_signature = sign_output
+                                                .tree
+                                                .get_leaf(path)
+                                                .unwrap()
+                                                .get(name)
+                                                .unwrap();
+                                            // Only struct classes can define methods
+                                            let class_signature = match1!(class_signature, Signature::Class(ClassSignature::Struct(signature)) => signature);
+
+                                            let (method_type, signature) = *class_signature.methods.get(&func.name).as_ref().unwrap();
+
+                                            let this = if method_type == &MethodType::Instance {
+                                                let mut full_name = path.clone();
+                                                full_name.push(name.clone());
+
+                                                Some(Ty::Generic(
+                                                    TyName::Defined(full_name, DefinedType::Struct),
+                                                    vec![]
+                                                ))
+                                            } else {
+                                                None
+                                            };
+
+                                            let output = Context::typecheck_func(func, signature, &sign_output, path, this)?;
+                                            methods.insert(func.name.clone(), output);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                checked.insert(name.clone(), FinalContext::Class(methods));
                             }
                             _ => {}
                         },

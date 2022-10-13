@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 
-use super::check::Ty;
+use super::{check::Ty, builtin::prelude::MethodType};
 use crate::core::Tree;
 use std::collections::HashMap;
 
@@ -45,6 +45,8 @@ pub enum TypeDef {
 pub struct Struct {
     pub name: String,
     pub fields: Vec<(String, TyExpr)>,
+    pub methods: Vec<(MethodType, Function)>,
+    pub constructor: Option<Function>,
 }
 
 /// An Anchor account definition.
@@ -53,6 +55,7 @@ pub struct Account {
     pub name: String,
     // Save type info for generation later
     pub fields: Vec<(String, TyExpr, Ty)>,
+    pub methods: Vec<(MethodType, Function)>,
 }
 
 /// An `enum` definition.

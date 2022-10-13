@@ -2,14 +2,21 @@
 // yet
 use crate::core::{
     clean::ast as ca,
-    compile::{builtin as bi, namespace::*},
+    compile::{
+        ast::ExpressionObj,
+        build::{Transformation, Transformed},
+        builtin as bi,
+        namespace::*,
+    },
     util::*,
 };
+use crate::match1;
 // LOL I JUST LEARNED THAT I COULD DO THIS INSTEAD OF IMPORTING FROM CRATE
 use super::{
     builtin::{Builtin, BuiltinSource},
     check::{DefinedType, ParamType, Ty, TyName},
 };
+use quote::quote;
 use std::collections::HashMap;
 
 enum Error {
@@ -17,6 +24,8 @@ enum Error {
     EnumAccount,
     InvalidEnumVariant,
     InvalidClassField,
+    InvalidClassConstructor,
+    AccountConstructor,
 }
 
 impl Error {
@@ -35,6 +44,14 @@ impl Error {
                 "invalid class field",
                 "Help: make sure your field has nothing but a type annotation:\n\n    field_name: Type"
             ),
+            Self::InvalidClassConstructor => CoreError::make_raw(
+                "invalid class constructor",
+                "Help: class constructors (__init__ methods) must be instance methods (have a self parameter), and must return nothing."
+            ),
+            Self::AccountConstructor => CoreError::make_raw(
+                "accounts may not have constructors",
+                "Help: new accounts must be created through the Solana system program, try using the Empty.init(...) syntax instead."
+            )
         }
         .located(loc.clone())
     }
@@ -73,8 +90,41 @@ pub struct StructSignature {
     pub is_account: bool,
     pub bases: Vec<Ty>,
     pub fields: HashMap<String, Ty>,
-    // methods: HashMap<String, Ty>,
-    // TODO special methods like constructor?
+    pub methods: HashMap<String, (MethodType, FunctionSignature)>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MethodType {
+    Instance,
+    Static,
+}
+
+impl StructSignature {
+    pub fn constructor(&self, name: TyName) -> Option<Box<Ty>> {
+        let func = self.methods.get("__init__");
+
+        return func.as_ref().map(
+            |(_, FunctionSignature { params, returns })| {
+                Ty::Function(
+                    params.clone(),
+                    // Need to transform Python's constructor syntax: `Class(...args)`
+                    // to our Rust constructor syntax: `Class::__new__(...args)`
+                    Ty::Transformed(
+                        Ty::Generic(name, vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let (class, args) = match1!(expr.obj, ExpressionObj::Call { function, args } => (function, args));
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #class::__new__(#(#args),*)
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        })
+                    ).into()
+                ).into()
+            }
+        );
+    }
 }
 
 /// Signature for a class that gets treated as an enum.
@@ -164,6 +214,7 @@ impl TryFrom<NamespaceOutput> for SignOutput {
                             is_account,
                             bases,
                             fields,
+                            methods,
                         })) => Signature::Class(ClassSignature::Struct(StructSignature {
                             is_account,
                             bases,
@@ -171,6 +222,7 @@ impl TryFrom<NamespaceOutput> for SignOutput {
                                 .into_iter()
                                 .map(|(name, ty)| (name, raw_tree.correct(ty)))
                                 .collect(),
+                            methods,
                         })),
                         Signature::Function(FunctionSignature { params, returns }) => {
                             Signature::Function(FunctionSignature {
@@ -250,6 +302,9 @@ fn build_signature(
 
                             variants.insert(name.clone(), ());
                         }
+                        _ => {
+                            todo!();
+                        }
                     }
                 }
 
@@ -258,6 +313,8 @@ fn build_signature(
                 })))
             } else {
                 let mut fields = HashMap::new();
+                let mut methods = HashMap::new();
+
                 for statement in body.iter() {
                     let Located(loc, obj) = statement;
 
@@ -269,6 +326,43 @@ fn build_signature(
 
                             fields.insert(name.clone(), root.build_ty(&ty.as_ref().unwrap(), abs)?);
                         }
+                        ca::ClassDefStatementObj::MethodDef(ca::FunctionDef {
+                            name,
+                            params,
+                            returns,
+                            ..
+                        }) => {
+                            if params.is_instance_method {
+                                if name == "__init__" {
+                                    if is_account {
+                                        return Err(Error::AccountConstructor.core(loc));
+                                    }
+                                    if returns.is_some() {
+                                        return Err(Error::InvalidClassConstructor.core(loc));
+                                    }
+                                }
+
+                                methods.insert(
+                                    name.clone(),
+                                    (
+                                        MethodType::Instance,
+                                        build_function_signature(params, returns, abs, root)?,
+                                    ),
+                                );
+                            } else {
+                                if name == "__init__" {
+                                    return Err(Error::InvalidClassConstructor.core(loc));
+                                }
+
+                                methods.insert(
+                                    name.clone(),
+                                    (
+                                        MethodType::Static,
+                                        build_function_signature(params, returns, abs, root)?,
+                                    ),
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -276,6 +370,7 @@ fn build_signature(
                     is_account,
                     fields,
                     bases: bases_,
+                    methods,
                 })))
             }
         }
@@ -284,29 +379,38 @@ fn build_signature(
             // decorator_list,
             returns,
             ..
-        }) => {
-            let params = params
-                .params
-                .iter()
-                .map(|Located(_, ca::ParamObj { arg, annotation })| {
-                    let ty = root.build_ty(annotation, abs)?;
-                    Ok((arg.clone(), ty, ParamType::Required))
-                })
-                .collect::<CResult<Vec<_>>>()?;
-
-            let returns = returns
-                .as_ref()
-                .map(|ty| root.build_ty(ty, abs))
-                .unwrap_or(Ok(Ty::Generic(
-                    TyName::Builtin(bi::python::Python::None.into()),
-                    vec![],
-                )))?;
-
-            Ok(Signature::Function(FunctionSignature { params, returns }))
-        }
+        }) => Ok(Signature::Function(build_function_signature(
+            params, returns, abs, root,
+        )?)),
         _ => panic!(),
     }
     .map_err(|err: Error| err.core(loc))
+}
+
+fn build_function_signature(
+    params: &ca::Params,
+    returns: &Option<ca::TyExpression>,
+    abs: &Vec<String>,
+    root: &Tree<Namespace>,
+) -> CResult<FunctionSignature> {
+    let params = params
+        .params
+        .iter()
+        .map(|Located(_, ca::ParamObj { arg, annotation })| {
+            let ty = root.build_ty(annotation, abs)?;
+            Ok((arg.clone(), ty, ParamType::Required))
+        })
+        .collect::<CResult<Vec<_>>>()?;
+
+    let returns = returns
+        .as_ref()
+        .map(|ty| root.build_ty(ty, abs))
+        .unwrap_or(Ok(Ty::Generic(
+            TyName::Builtin(bi::python::Python::None.into()),
+            vec![],
+        )))?;
+
+    return Ok(FunctionSignature { params, returns });
 }
 
 pub fn sign(registry: NamespaceOutput) -> Result<SignOutput, CoreError> {

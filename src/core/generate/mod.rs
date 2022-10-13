@@ -8,6 +8,8 @@ use regex::Regex;
 #[cfg(not(target_arch = "wasm32"))]
 use rustfmt_wrapper::{config::*, rustfmt_config, Error as RustfmtError};
 
+use super::compile::builtin::prelude::MethodType;
+
 pub type GenerateOutput = Tree<String>;
 
 /// Convenience function for turning strings into Idents
@@ -121,7 +123,12 @@ impl ToTokens for TypeDef {
 
 impl ToTokens for Struct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { name, fields } = self;
+        let Self {
+            name,
+            fields,
+            methods,
+            constructor,
+        } = self;
         let name = ident(name);
         let fields = fields.iter().map(|(name, ty)| {
             let name = ident(name);
@@ -129,13 +136,81 @@ impl ToTokens for Struct {
             quote! { pub #name: #ty }
         });
 
-        tokens.extend(quote! { struct #name { #(#fields),* } });
+        let mut instance_methods = vec![];
+        let mut static_methods = vec![];
+
+        if let Some(func) = constructor {
+            // This might look esoteric but it's actually pretty much exactly how Python uses
+            // constructors under the hood - a __new__ method calls the user-defined __init__ to
+            // perform the heavy lifting of the constructor.
+            let ext_params = func.params.iter().map(|(name, ty)| {
+                let name = ident(name);
+
+                quote! { #name: #ty }
+            });
+
+            let ext_param_names = func.params.iter().map(|(name, _)| {
+                let name = ident(name);
+
+                quote! { #name }
+            });
+
+            let func = InstanceMethod(func);
+
+            instance_methods.push(quote! { #func });
+
+            static_methods.push(quote! {
+                pub fn __new__(#(#ext_params),*) -> Mutable<Self> {
+                    let obj = Mutable::new(#name::default());
+                    obj.__init__(#(#ext_param_names),*);
+                    return obj;
+                }
+            });
+        }
+
+        for (method_type, func) in methods.iter() {
+            match method_type {
+                MethodType::Instance => {
+                    let method = InstanceMethod(func);
+
+                    instance_methods.push(quote! { #method });
+                }
+                MethodType::Static => {
+                    static_methods.push(quote! { #func });
+                }
+            }
+        }
+
+        // Split up the instance methods and static methods: each instance method of a class will
+        // belong to an `impl Mutable<Class>` block, and the static methods will belong to an
+        // `impl Class` block.
+
+        let instance_impl = if instance_methods.len() > 0 {
+            Some(quote! { impl Mutable<#name> { #(#instance_methods)* } })
+        } else {
+            None
+        };
+
+        let static_impl = if static_methods.len() > 0 {
+            Some(quote! { impl #name { #(#static_methods)* } })
+        } else {
+            None
+        };
+
+        tokens.extend(quote! {
+            #[derive(Clone, Debug, Default)]
+            pub struct #name { #(#fields),* }
+
+            #instance_impl
+
+            #static_impl
+        });
     }
 }
 
 impl ToTokens for Account {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { name, fields } = self;
+        let Self { name, fields, methods } = self;
 
         let account_name = ident(name);
         let loaded_name = ident(&format!("Loaded{}", name));
@@ -192,6 +267,32 @@ impl ToTokens for Account {
             }
         });
 
+        let mut instance_methods = vec![];
+        let mut static_methods = vec![];
+
+        for (method_type, func) in methods.iter() {
+            match method_type {
+                MethodType::Instance => {
+                    let method = InstanceMethod(func);
+
+                    instance_methods.push(quote! { #method });
+                }
+                MethodType::Static => {
+                    static_methods.push(quote! { #func });
+                }
+            }
+        }
+
+        // Like regular structs, split up the instance methods and static methods: each instance
+        // method of an account will belong to an `impl Mutable<LoadedAccount<'_, '_>>` block, and
+        // the static methods will belong to the original `impl Account` block.
+
+        let instance_impl = if instance_methods.len() > 0 {
+            Some(quote! { impl Mutable<#loaded_name<'_, '_>> { #(#instance_methods)* } })
+        } else {
+            None
+        };
+
         tokens.extend(quote! {
             #[account]
             #[derive(Debug)]
@@ -211,6 +312,8 @@ impl ToTokens for Account {
                     let mut loaded = loaded.borrow_mut();
                     #(#store_fields)*
                 }
+
+                #(#static_methods)*
             }
 
             #[derive(Debug)]
@@ -219,6 +322,8 @@ impl ToTokens for Account {
                 pub __programs__: &'entrypoint ProgramsMap<'info>,
                 #(#loaded_fields),*
             }
+
+            #instance_impl
         });
     }
 }
@@ -344,6 +449,48 @@ impl ToTokens for Function {
 
             quote! { mut #name: #ty }
         });
+
+        tokens.extend(quote! {
+            pub fn #name #info_lifetime(#(#params),*) -> #returns #body
+        });
+    }
+}
+
+/// Newtype for an instance method of a mutable type.
+struct InstanceMethod<'a>(&'a Function);
+
+impl<'a> ToTokens for InstanceMethod<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Function {
+            ix_context,
+            name,
+            info_lifetime,
+            params,
+            returns,
+            body,
+        } = self.0;
+
+        let name = if ix_context.is_some() {
+            ident(&format!("{}_handler", name))
+        } else {
+            ident(name)
+        };
+
+        let info_lifetime = if *info_lifetime {
+            Some(quote! { <'info> })
+        } else {
+            None
+        };
+
+        let params = [quote! { &self }]
+            .into_iter()
+            .chain(
+                params.iter().map(|(name, ty)| {
+                    let name = ident(name);
+
+                    quote! { mut #name: #ty }
+                })
+            );
 
         tokens.extend(quote! {
             pub fn #name #info_lifetime(#(#params),*) -> #returns #body
@@ -1034,7 +1181,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
         // Utility structs, functions, and macros to beautify the generated code a little.
         pub mod seahorse_util {
             use super::*;
-            use std::{collections::HashMap, ops::Deref};
+            use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
             // A "Python mutable" object.
             pub struct Mutable<T>(Rc<RefCell<T>>);
@@ -1059,6 +1206,19 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 }
             }
 
+            impl<T: Debug> Debug for Mutable<T> {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+
+            impl <T: Default> Default for Mutable<T> {
+                fn default() -> Self {
+                    Self::new(T::default())
+                }
+            }
+
+            // Pythonic indexing for vec/array types (Seahorse List, Array types)
             impl<T: Clone> Mutable<Vec<T>> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
                     if index > 0 {
@@ -1070,7 +1230,6 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 }
             }
 
-            // TODO const generics allowed here?
             impl<T: Clone, const N: usize> Mutable<[T; N]> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
                     if index > 0 {
