@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1]
+
 ### Fixed
 
 - Removed some of the unnecessary `borrow()`s from appearing in seed lists.
@@ -18,3 +20,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow non-account classes to define constructors
 
 ## [0.2.0] - 2022-10-05
+
+- Added changelog.
