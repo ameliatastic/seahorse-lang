@@ -1149,6 +1149,21 @@ impl BuiltinSource for Prelude {
                         }),
                     ),
                 )),
+                Builtin::Python(Python::Iter) => Some((
+                    Ty::prelude(self.clone(), vec![Ty::Anonymous(0), Ty::Anonymous(1)]),
+                    Ty::Transformed(
+                        Ty::python(Python::Iter, vec![Ty::Anonymous(0)]).into(),
+                        Transformation::new(|mut expr| {
+                            let array = expr.obj;
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                (#array.borrow().iter().map(|element| element.clone()))
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        })
+                    )
+                )),
                 _ => None,
             },
             Self::Signer => match builtin {

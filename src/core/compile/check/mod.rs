@@ -30,6 +30,7 @@ enum Error {
     IsNotFunction(Ty),
     IsNotTarget,
     Unification(Ty, Ty),
+    UnificationConst(u64, u64),
     UnificationBase(TyName, TyName),
     UnificationTyParams(TyName, usize, usize),
     UnificationFunctionParams(usize),
@@ -78,6 +79,12 @@ impl Error {
             Self::IsNotTarget => CoreError::make_raw("expression is not an assignment target", ""),
             Self::Unification(t, u) => {
                 CoreError::make_raw(format!("type mismatch - expected {}, found {}", t, u), "")
+            }
+            Self::UnificationConst(n, m) => {
+                CoreError::make_raw(
+                    format!("constant mismatch - expected {}, found {}", n, m),
+                    "Help: you most likely have two arrays with mismatched sizes."
+                )
             }
             Self::UnificationBase(x, y) => {
                 CoreError::make_raw(format!("type mismatch - expected an instance of {}, found an instance of {}", x, y), "")
@@ -1911,6 +1918,12 @@ impl<'a> Context<'a> {
             // Handle any/never
             (Ty::Any, t) => Ok(t),
             (t, Ty::Never) => Ok(t),
+            // Handle consts
+            (Ty::Const(n), Ty::Const(m)) => if n == m {
+                Ok(Ty::Const(n))
+            } else {
+                Err(Error::UnificationConst(n, m).core(loc))
+            },
             // Match generics
             (Ty::Generic(x, a), Ty::Generic(y, b)) => {
                 if x != y {
