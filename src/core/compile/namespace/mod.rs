@@ -17,24 +17,41 @@ impl Error {
     fn core(self) -> CoreError {
         match self {
             Self::ImportNotFound(ext) => {
-                CoreError::make_raw("import not found", format!("Path: {:?}", ext.into_iter()))
+                CoreError::make_raw(format!("module \"{}\" not found", path_to_string(&ext)), "")
             }
             Self::CircularImport(path) => CoreError::make_raw(
                 "circular import",
-                format!("Path: {:?}", path.into_iter().skip(1).collect::<Vec<_>>()),
+                format!(
+                    "Path: \"{}\".",
+                    path_to_string(&path.into_iter().skip(1).collect::<Vec<_>>())
+                ),
             ),
             Self::SymbolNotFound(symbol) => {
-                CoreError::make_raw(format!("symbol not found: \"{}\"", symbol), "")
+                CoreError::make_raw(format!("symbol \"{}\" not found", symbol), "")
             }
-            // TODO display instead for all of these
             Self::NotDefType(path) => {
-                CoreError::make_raw(format!("\"{:?}\" is not a class", path), "")
+                CoreError::make_raw(format!("\"{}\" is not a class", path_to_string(&path)), "")
             }
-            Self::NoSuchSymbol(rel) => {
-                CoreError::make_raw("symbol not found", format!("{:?}", rel))
-            }
+            Self::NoSuchSymbol(rel) => CoreError::make_raw(
+                format!("symbol \"{}\" not found", path_to_string(&rel)),
+                "",
+            ),
         }
     }
+}
+
+fn path_to_string(path: &Vec<String>) -> String {
+    if path.len() == 0 {
+        return "".to_string();
+    }
+
+    let mut path_string = path[0].clone();
+    for part in path.iter().skip(1) {
+        path_string.push('.');
+        path_string.push_str(part.as_str());
+    }
+
+    return path_string;
 }
 
 /// The output of the "namespace" step. Transforms modules into namespaces, which are simply maps
