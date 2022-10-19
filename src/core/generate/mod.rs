@@ -210,7 +210,11 @@ impl ToTokens for Struct {
 
 impl ToTokens for Account {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { name, fields, methods } = self;
+        let Self {
+            name,
+            fields,
+            methods,
+        } = self;
 
         let account_name = ident(name);
         let loaded_name = ident(&format!("Loaded{}", name));
@@ -484,13 +488,11 @@ impl<'a> ToTokens for InstanceMethod<'a> {
 
         let params = [quote! { &self }]
             .into_iter()
-            .chain(
-                params.iter().map(|(name, ty)| {
-                    let name = ident(name);
+            .chain(params.iter().map(|(name, ty)| {
+                let name = ident(name);
 
-                    quote! { mut #name: #ty }
-                })
-            );
+                quote! { mut #name: #ty }
+            }));
 
         tokens.extend(quote! {
             pub fn #name #info_lifetime(#(#params),*) -> #returns #body

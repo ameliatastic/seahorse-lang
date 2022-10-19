@@ -1161,8 +1161,8 @@ impl BuiltinSource for Prelude {
                             });
 
                             Ok(Transformed::Expression(expr))
-                        })
-                    )
+                        }),
+                    ),
                 )),
                 _ => None,
             },

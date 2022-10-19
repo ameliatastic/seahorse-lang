@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 
-use super::{check::Ty, builtin::prelude::MethodType};
+use super::{builtin::prelude::MethodType, check::Ty};
 use crate::core::Tree;
 use std::collections::HashMap;
 
@@ -387,7 +387,7 @@ impl ExpressionObj {
             Self::BinOp { left, op, right } => Self::BinOp {
                 left: left.without_borrows().into(),
                 op,
-                right: right.without_borrows().into()
+                right: right.without_borrows().into(),
             },
             Self::Index { value, index } => Self::Index {
                 value: value.without_borrows().into(),
@@ -395,41 +395,50 @@ impl ExpressionObj {
             },
             Self::TupleIndex { tuple, index } => Self::TupleIndex {
                 tuple: tuple.without_borrows().into(),
-                index
+                index,
             },
             Self::UnOp { op, value } => Self::UnOp {
                 op,
-                value: value.without_borrows().into()
+                value: value.without_borrows().into(),
             },
             Self::Attribute { value, name } => Self::Attribute {
                 value: value.without_borrows().into(),
-                name
+                name,
             },
             Self::StaticAttribute { value, name } => Self::StaticAttribute {
                 value: value.without_borrows().into(),
-                name
+                name,
             },
             Self::Call { function, args } => Self::Call {
                 function: function.without_borrows().into(),
-                args: args.into_iter().map(|arg| arg.without_borrows()).collect()
+                args: args.into_iter().map(|arg| arg.without_borrows()).collect(),
             },
             Self::Ternary { cond, body, orelse } => Self::Ternary {
                 cond: cond.without_borrows().into(),
                 body: body.without_borrows().into(),
-                orelse: orelse.without_borrows().into()
+                orelse: orelse.without_borrows().into(),
             },
             Self::As { value, ty } => Self::As {
                 value: value.without_borrows().into(),
-                ty
+                ty,
             },
             Self::Vec(elements) => Self::Vec(
-                elements.into_iter().map(|element| element.without_borrows()).collect()
+                elements
+                    .into_iter()
+                    .map(|element| element.without_borrows())
+                    .collect(),
             ),
             Self::Array(elements) => Self::Array(
-                elements.into_iter().map(|element| element.without_borrows()).collect()
+                elements
+                    .into_iter()
+                    .map(|element| element.without_borrows())
+                    .collect(),
             ),
             Self::Tuple(elements) => Self::Tuple(
-                elements.into_iter().map(|element| element.without_borrows()).collect()
+                elements
+                    .into_iter()
+                    .map(|element| element.without_borrows())
+                    .collect(),
             ),
             Self::Ref(value) => Self::Ref(value.without_borrows().into()),
             Self::Move(value) => Self::Move(value.without_borrows().into()),
@@ -437,7 +446,7 @@ impl ExpressionObj {
             Self::Mutable(value) => Self::Mutable(value.without_borrows().into()),
             // Deliberately skipping `Block` for now, there's no good way to map the body of a
             // block to a body with no borrows
-            obj => obj
+            obj => obj,
         }
     }
 }

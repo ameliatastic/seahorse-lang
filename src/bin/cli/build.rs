@@ -83,7 +83,9 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 .output()?;
             let stderr = String::from_utf8(anchor_output.stderr)?;
 
-            if !anchor_output.status.success() || stderr.contains("error") | stderr.contains("panicked") {
+            if !anchor_output.status.success()
+                || stderr.contains("error") | stderr.contains("panicked")
+            {
                 return Err(
                     error_message(format!("{} failed:\n{}", "anchor build", stderr)).into(),
                 );

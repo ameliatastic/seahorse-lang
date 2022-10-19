@@ -1393,7 +1393,10 @@ impl<'a> Context<'a> {
                                     expr_ty,
                                     Ty::Type(
                                         TyName::Defined(path.clone(), DefinedType::Struct),
-                                        sig.constructor(TyName::Defined(path.clone(), DefinedType::Struct)),
+                                        sig.constructor(TyName::Defined(
+                                            path.clone(),
+                                            DefinedType::Struct,
+                                        )),
                                     ),
                                     loc,
                                 )?,
@@ -1448,7 +1451,10 @@ impl<'a> Context<'a> {
                                 expr_ty,
                                 Ty::Type(
                                     TyName::Defined(path.clone(), DefinedType::Struct),
-                                    sig.constructor(TyName::Defined(path.clone(), DefinedType::Struct)),
+                                    sig.constructor(TyName::Defined(
+                                        path.clone(),
+                                        DefinedType::Struct,
+                                    )),
                                 ),
                                 loc,
                             )?,
@@ -1919,11 +1925,13 @@ impl<'a> Context<'a> {
             (Ty::Any, t) => Ok(t),
             (t, Ty::Never) => Ok(t),
             // Handle consts
-            (Ty::Const(n), Ty::Const(m)) => if n == m {
-                Ok(Ty::Const(n))
-            } else {
-                Err(Error::UnificationConst(n, m).core(loc))
-            },
+            (Ty::Const(n), Ty::Const(m)) => {
+                if n == m {
+                    Ok(Ty::Const(n))
+                } else {
+                    Err(Error::UnificationConst(n, m).core(loc))
+                }
+            }
             // Match generics
             (Ty::Generic(x, a), Ty::Generic(y, b)) => {
                 if x != y {

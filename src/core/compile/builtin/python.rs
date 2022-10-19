@@ -699,7 +699,9 @@ impl BuiltinSource for Python {
 
                             let list = match expr.obj {
                                 ExpressionObj::Mutable(obj) => match obj.obj {
-                                    ExpressionObj::Vec(list) => list.into_iter().map(|element| element.without_borrows()),
+                                    ExpressionObj::Vec(list) => {
+                                        list.into_iter().map(|element| element.without_borrows())
+                                    }
                                     _ => {
                                         return Err(err);
                                     }

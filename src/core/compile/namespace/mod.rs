@@ -32,10 +32,9 @@ impl Error {
             Self::NotDefType(path) => {
                 CoreError::make_raw(format!("\"{}\" is not a class", path_to_string(&path)), "")
             }
-            Self::NoSuchSymbol(rel) => CoreError::make_raw(
-                format!("symbol \"{}\" not found", path_to_string(&rel)),
-                "",
-            ),
+            Self::NoSuchSymbol(rel) => {
+                CoreError::make_raw(format!("symbol \"{}\" not found", path_to_string(&rel)), "")
+            }
         }
     }
 }
