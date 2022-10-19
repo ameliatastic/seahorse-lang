@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Bug that prevented numeric constant types from being unified (impacted array handling)
+- Ambiguous error messages caused by unresolved imports
 
 ### Added
 
