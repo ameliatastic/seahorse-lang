@@ -917,7 +917,7 @@ impl<'a> Context<'a> {
                     }
                 }
                 Signature::Class(ClassSignature::Enum(EnumSignature { variants })) => {
-                    if variants.contains_key(attr) {
+                    if variants.iter().any(|(name, _)| name == attr) {
                         Some((
                             Ty::Anonymous(0),
                             Ty::Generic(TyName::Defined(path.clone(), DefinedType::Enum), vec![]),
