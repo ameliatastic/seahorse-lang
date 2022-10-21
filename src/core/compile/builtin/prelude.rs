@@ -34,6 +34,7 @@ pub enum Prelude {
     Ceil,
     ArrayConstructor,
     IntBytes,
+    Size,
     // Directives
     DeclareId,
     // Decorators
@@ -69,6 +70,7 @@ pub fn namespace() -> Namespace {
         ("floor", Prelude::Floor),
         ("ceil", Prelude::Ceil),
         ("int_bytes", Prelude::IntBytes),
+        ("size", Prelude::Size),
         ("array", Prelude::ArrayConstructor),
         ("declare_id", Prelude::DeclareId),
         ("instruction", Prelude::Instruction),
@@ -109,6 +111,7 @@ impl BuiltinSource for Prelude {
             Self::Floor => "floor",
             Self::Ceil => "ceil",
             Self::IntBytes => "int_bytes",
+            Self::Size => "size",
             Self::ArrayConstructor => "array",
             Self::DeclareId => "declare_id",
             Self::Instruction => "instruction",
@@ -279,6 +282,26 @@ impl BuiltinSource for Prelude {
 
                         Ok(Transformed::Expression(expr))
                     })
+                )
+            ),
+            // size(str) -> u64
+            Self::Size => Ty::new_function(
+                vec![
+                    ("s", Ty::python(Python::Str, vec![]), ParamType::Required)
+                ],
+                Ty::Transformed(
+                    Ty::prelude(Self::RustInt(false, 64), vec![]).into(),
+                    Transformation::new(|mut expr| {
+                        let args = match1!(expr.obj, ExpressionObj::Call { args, .. } => args);
+                        let s = args.into_iter().next().unwrap();
+
+                        expr.obj = ExpressionObj::As {
+                            value: ExpressionObj::Rendered(quote! { #s.len() }).into(),
+                            ty: TyExpr::new_specific(vec!["u64"], Mutability::Immutable)
+                        };
+
+                        Ok(Transformed::Expression(expr))
+                    }),
                 )
             ),
             Self::ArrayConstructor => Ty::ArrayConstructor2,
