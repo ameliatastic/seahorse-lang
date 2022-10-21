@@ -336,16 +336,25 @@ impl ToTokens for Enum {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self { name, variants } = self;
         let name = ident(name);
-        let variants = variants.iter().map(|(name, _)| {
+        let variants_tokens = variants.iter().map(|(name, _)| {
             let name = ident(name);
 
             quote! { #name }
         });
 
+        let (first_variant, _) = &variants[0];
+        let first_variant = ident(first_variant);
+
         tokens.extend(quote! {
-            #[derive(Clone, Debug, PartialEq, AnchorSerialize, AnchorDeserialize)]
+            #[derive(Clone, Debug, PartialEq, AnchorSerialize, AnchorDeserialize, Copy)]
             pub enum #name {
-                #(#variants),*
+                #(#variants_tokens),*
+            }
+
+            impl Default for #name {
+                fn default() -> Self {
+                    #name::#first_variant
+                }
             }
         });
     }

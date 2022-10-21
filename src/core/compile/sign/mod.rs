@@ -130,7 +130,7 @@ impl StructSignature {
 /// Signature for a class that gets treated as an enum.
 #[derive(Clone, Debug)]
 pub struct EnumSignature {
-    pub variants: HashMap<String, ()>,
+    pub variants: Vec<(String, ())>,
 }
 
 /// Signature for a function.
@@ -290,7 +290,7 @@ fn build_signature(
             }
 
             if is_enum {
-                let mut variants = HashMap::new();
+                let mut variants = vec![];
                 for statement in body.iter() {
                     let Located(loc, obj) = statement;
 
@@ -300,7 +300,7 @@ fn build_signature(
                                 return Err(Error::InvalidEnumVariant.core(loc));
                             }
 
-                            variants.insert(name.clone(), ());
+                            variants.push((name.clone(), ()));
                         }
                         _ => {
                             todo!();
