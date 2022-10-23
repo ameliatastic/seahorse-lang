@@ -407,6 +407,11 @@ impl BuiltinSource for Prelude {
                             Ty::python(Python::Bool, vec![]),
                             ParamType::Optional,
                         ),
+                        (
+                            "space",
+                            Ty::prelude(Self::RustInt(false, 64), vec![]),
+                            ParamType::Optional,
+                        ),
                     ],
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
@@ -438,6 +443,7 @@ impl BuiltinSource for Prelude {
                                     ));
                                 }
                             };
+                            let space = args.next().unwrap().optional();
 
                             annotation.payer = Some(payer);
                             annotation.seeds = seeds.map(|seeds| {
@@ -460,12 +466,16 @@ impl BuiltinSource for Prelude {
                                                 "Hint: you can only pass in a payer and optionally a list of seeds."
                                             ));
                                         }
+
+                                        annotation.space = space;
                                     }
+                                    // TODO: when we add padding make sure they're not both set
                                     TyName::Builtin(Builtin::Prelude(Self::TokenMint)) => {
                                         if mint.is_some()
                                             || authority.is_none()
                                             || decimals.is_none()
                                             || associated.is_some()
+                                            || space.is_some()
                                         {
                                             return Err(CoreError::make_raw(
                                                 "invalid argument to Empty[TokenMint].init()",
@@ -480,6 +490,7 @@ impl BuiltinSource for Prelude {
                                         if mint.is_none()
                                             || authority.is_none()
                                             || decimals.is_some()
+                                            || space.is_some()
                                         {
                                             return Err(CoreError::make_raw(
                                                 "invalid argument to Empty[TokenAccount].init()",
