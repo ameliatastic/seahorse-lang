@@ -745,7 +745,7 @@ impl BuiltinSource for Python {
                             let string = expr.obj;
 
                             expr.obj = ExpressionObj::Rendered(quote! {
-                                (#string.len() as u64)
+                                (#string.chars().count() as u64)
                             });
 
                             Ok(Transformed::Expression(expr))
