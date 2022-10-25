@@ -839,3 +839,11 @@ def int_bytes(n: Any, be: bool = False) -> List[u8]:
     @param n: The integer you wish to convert to bytes.
     @param be: Whether you want the conversion to be big-endian - defaults to false.
     """
+
+def size(ob: str) -> u64:
+    """
+    Get the size of an object in bytes.
+    Currently this is only supported for strings.
+    
+    @param ob: The object to get the size of.
+    """

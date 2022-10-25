@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Allow storing arrays of enums on an account
+- New `size` function that returns the size of a string (for now) in bytes
 - Allow setting `space` or `padding` on account init to customise account size
+
+### Changed
+
+- `len(str)` now has the same behaviour as Python, and returns character count. This may be different to the size in bytes
 
 ## [0.2.2]
 
