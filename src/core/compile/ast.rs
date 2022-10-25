@@ -178,6 +178,8 @@ pub struct AccountAnnotation {
     pub mint_authority: Option<TypedExpression>,
     pub token_mint: Option<TypedExpression>,
     pub token_authority: Option<TypedExpression>,
+    pub space: Option<TypedExpression>,
+    pub padding: Option<TypedExpression>,
 }
 
 impl AccountAnnotation {
@@ -192,6 +194,8 @@ impl AccountAnnotation {
             mint_authority: None,
             token_mint: None,
             token_authority: None,
+            space: None,
+            padding: None,
         }
     }
 }

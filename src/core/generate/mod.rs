@@ -620,6 +620,8 @@ impl<'a> ToTokens for AccountAnnotationWithTyExpr<'a> {
                 token_authority,
                 mint_decimals,
                 mint_authority,
+                space,
+                padding,
             },
             ty_expr,
         ) = self;
@@ -635,9 +637,16 @@ impl<'a> ToTokens for AccountAnnotationWithTyExpr<'a> {
             if let AccountTyExpr::Defined(name) = &**ty_expr {
                 let ty_expr = StaticPath(name);
 
-                params.push(Some(
-                    quote! { init, space = std::mem::size_of::<#ty_expr>() + 8 },
-                ));
+                let space = match (space, padding) {
+                    (None, None) => quote! { std::mem::size_of::<#ty_expr>() + 8 },
+                    (Some(s), None) => quote! { #s as usize },
+                    (None, Some(p)) => {
+                        quote! { std::mem::size_of::<#ty_expr>() + 8 + (#p as usize) }
+                    }
+                    (Some(_), Some(_)) => panic!(), // we protect against this in prelude.rs
+                };
+
+                params.push(Some(quote! { init, space = #space }));
             } else {
                 params.push(Some(quote! { init }));
             }

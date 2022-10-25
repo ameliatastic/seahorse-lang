@@ -691,7 +691,7 @@ class Signer(AccountWithKey):
 class Empty(Generic[T]):
     """An account that needs to be initialized."""
 
-    def init(self, payer: Signer, seeds: List[Any] = None, mint: 'TokenMint' = None, decimals: u8 = None, authority: AccountWithKey = None, associated: bool = False) -> T:
+    def init(self, payer: Signer, seeds: List[Any] = None, mint: 'TokenMint' = None, decimals: u8 = None, authority: AccountWithKey = None, associated: bool = False, space: u64 = None, padding: u64 = None)  -> T:
         """
         Initialize the account.
         
@@ -701,6 +701,8 @@ class Empty(Generic[T]):
         @param decimals: If initializing a TokenMint, this is the number of decimals the new token has.
         @param authority: If initializing a TokenAccount/TokenMint, this is the account that has authority over the account.
         @param associated: If initializing an associated token account, must be set to true.
+        @param space: If initializing a program account, you can use this to overwrite Seahorse's calculation of the account size.
+        @param padding: If initializing a program account, you can use this to add extra space to Seahorse's calculation of the account size.
         @returns: The new, initialized account. All of the data in this account will be set to 0, bytewise.
         """
 
