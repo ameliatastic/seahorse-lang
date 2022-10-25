@@ -287,16 +287,16 @@ impl BuiltinSource for Prelude {
             // size(str) -> u64
             Self::Size => Ty::new_function(
                 vec![
-                    ("s", Ty::python(Python::Str, vec![]), ParamType::Required)
+                    ("ob", Ty::python(Python::Str, vec![]), ParamType::Required)
                 ],
                 Ty::Transformed(
                     Ty::prelude(Self::RustInt(false, 64), vec![]).into(),
                     Transformation::new(|mut expr| {
                         let args = match1!(expr.obj, ExpressionObj::Call { args, .. } => args);
-                        let s = args.into_iter().next().unwrap();
+                        let ob = args.into_iter().next().unwrap();
 
                         expr.obj = ExpressionObj::As {
-                            value: ExpressionObj::Rendered(quote! { #s.len() }).into(),
+                            value: ExpressionObj::Rendered(quote! { #ob.len() }).into(),
                             ty: TyExpr::new_specific(vec!["u64"], Mutability::Immutable)
                         };
 
