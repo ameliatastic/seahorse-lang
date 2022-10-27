@@ -209,7 +209,7 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                         params,
                     },
                 },
-                TyName::Defined(_, DefinedType::Struct | DefinedType::Enum) => TyExpr::Generic {
+                TyName::Defined(_, DefinedType::Struct | DefinedType::Enum | DefinedType::Event) => TyExpr::Generic {
                     mutability,
                     name: base,
                     params,
@@ -1021,7 +1021,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                         ) => match signature {
                                             Signature::Class(ClassSignature::Struct(
                                                 StructSignature {
-                                                    is_account, fields: mut fields_map, methods: mut methods_map, ..
+                                                    is_account, is_event, fields: mut fields_map, methods: mut methods_map, ..
                                                 },
                                             )) => {
                                                 let mut fields = vec![];
@@ -1073,7 +1073,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                                         name,
                                                         fields: fields.into_iter().map(|(name, ty, _)| (name, ty)).collect(),
                                                         methods,
-                                                        constructor
+                                                        constructor,
+                                                        is_event,
                                                     })
                                                 };
 

@@ -343,6 +343,7 @@ pub enum DefinedType {
     Struct,
     Account,
     Enum,
+    Event,
 }
 
 impl std::fmt::Display for TyName {
@@ -734,6 +735,7 @@ impl<'a> Context<'a> {
             Ty::Generic(t, _) => match t {
                 TyName::Builtin(x) => x.attr(attr),
                 TyName::Defined(path, DefinedType::Struct | DefinedType::Enum) => self.defined_attr(&path, attr),
+                TyName::Defined(path, DefinedType::Event) => self.defined_attr(&path, attr),
                 TyName::Defined(path, DefinedType::Account) => self.defined_attr(&path, attr).or_else(|| {
                     match attr.as_str() {
                         "key" => Some((
@@ -790,10 +792,7 @@ impl<'a> Context<'a> {
             },
             Ty::Type(t, _) => match t {
                 TyName::Builtin(x) => x.static_attr(attr).map(|t| (Ty::Anonymous(0), t)),
-                TyName::Defined(path, DefinedType::Struct | DefinedType::Enum) => self.defined_static_attr(&path, attr),
-                TyName::Defined(path, DefinedType::Account) => {
-                    self.defined_static_attr(&path, attr)
-                }
+                TyName::Defined(path, DefinedType::Struct | DefinedType::Enum | DefinedType::Account | DefinedType::Event) => self.defined_static_attr(&path, attr),
             },
             Ty::Path(mut abs) => match self.sign_output.namespace_output.tree.get(&abs) {
                 Some(Tree::Leaf(namespace)) => match namespace.get(attr) {

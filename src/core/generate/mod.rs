@@ -128,6 +128,7 @@ impl ToTokens for Struct {
             fields,
             methods,
             constructor,
+            is_event,
         } = self;
         let name = ident(name);
         let fields = fields.iter().map(|(name, ty)| {
@@ -197,8 +198,15 @@ impl ToTokens for Struct {
             None
         };
 
-        tokens.extend(quote! {
+        let macros = if *is_event { quote! {
             #[derive(Clone, Debug, Default)]
+        }} else { quote! {
+            #[event]
+            #[derive(Clone, Debug, Default)]
+        }};
+
+        tokens.extend(quote! {
+            #macros
             pub struct #name { #(#fields),* }
 
             #instance_impl
