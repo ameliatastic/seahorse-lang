@@ -155,6 +155,10 @@ impl Tree<Signed> {
                                 is_account: true,
                                 ..
                             })) => DefinedType::Account,
+                            Signature::Class(ClassSignature::Struct(StructSignature {
+                                is_event: true,
+                                ..
+                            })) => DefinedType::Event,
                             Signature::Class(ClassSignature::Enum(..)) => DefinedType::Enum,
                             _ => DefinedType::Struct,
                         };

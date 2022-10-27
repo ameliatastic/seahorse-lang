@@ -131,11 +131,6 @@ impl ToTokens for Struct {
             is_event,
         } = self;
         let name = ident(name);
-        let fields = fields.iter().map(|(name, ty)| {
-            let name = ident(name);
-
-            quote! { pub #name: #ty }
-        });
 
         let mut instance_methods = vec![];
         let mut static_methods = vec![];
@@ -186,8 +181,27 @@ impl ToTokens for Struct {
         // belong to an `impl Mutable<Class>` block, and the static methods will belong to an
         // `impl Class` block.
 
-        let instance_impl = if instance_methods.len() > 0 {
-            Some(quote! { impl Mutable<#name> { #(#instance_methods)* } })
+        let event_emit_fn = if *is_event {
+            let fs = fields.iter().map(|(name, _)| {
+                let name = ident(name);
+                quote! { #name: self.borrow().#name }
+            });
+
+            Some(quote! {
+                fn __emit__(&self) {
+                    emit!(#name { #(#fs),* })
+                }
+            })
+        } else {
+            None
+        };
+
+        let instance_impl = if instance_methods.len() > 0 || event_emit_fn.is_some() {
+            Some(quote! { impl Mutable<#name> {
+                #(#instance_methods)*
+
+                #event_emit_fn
+            }})
         } else {
             None
         };
@@ -199,11 +213,17 @@ impl ToTokens for Struct {
         };
 
         let macros = if *is_event { quote! {
-            #[derive(Clone, Debug, Default)]
-        }} else { quote! {
             #[event]
             #[derive(Clone, Debug, Default)]
+        }} else { quote! {
+            #[derive(Clone, Debug, Default)]
         }};
+
+        let fields = fields.iter().map(|(name, ty)| {
+            let name = ident(name);
+
+            quote! { pub #name: #ty }
+        });
 
         tokens.extend(quote! {
             #macros
