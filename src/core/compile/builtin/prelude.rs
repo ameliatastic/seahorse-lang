@@ -1234,6 +1234,23 @@ impl BuiltinSource for Prelude {
                 )),
                 _ => None,
             },
+            Self::Pubkey => match builtin {
+                Builtin::Prelude(Self::Seed) => Some((
+                    Ty::prelude(self.clone(), vec![]).into(),
+                    Ty::Transformed(
+                        ty.clone().into(),
+                        Transformation::new(|mut expr| {
+                            let obj = expr.obj.without_borrows();
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #obj.as_ref()
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                )),
+                _ => None,
+            },
             // TODO copied straight from Signer, should extract to a function or something
             Self::Program => match builtin {
                 Builtin::Prelude(Self::Account | Self::InitAccount) => {
