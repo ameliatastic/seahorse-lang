@@ -69,7 +69,11 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
             let mut input = File::open(input_path)?;
             input.read_to_string(&mut py_src)?;
 
-            let tree = compile(py_src, program_name.clone())?;
+            let tree = compile(
+                py_src,
+                program_name.clone(),
+                Some(project_path.join(SRC_PATH)),
+            )?;
 
             let src = project_path
                 .join("programs")

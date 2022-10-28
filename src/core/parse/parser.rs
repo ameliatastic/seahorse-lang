@@ -10,28 +10,28 @@ pub fn parse(source: String) -> Result<Program, CoreError> {
         match error {
             ParseErrorType::EOF => {
                 CoreError::make_raw("Python parse error", "Unexpected end of file")
-                    .located(location)
+                    .with_loc(location)
             }
             ParseErrorType::ExtraToken(tok) => CoreError::make_raw(
                 "Python parse error",
                 format!("Unexpected extra token ({})", tok),
             )
-            .located(location),
+            .with_loc(location),
             ParseErrorType::InvalidToken => {
-                CoreError::make_raw("Python parse error", "Invalid token").located(location)
+                CoreError::make_raw("Python parse error", "Invalid token").with_loc(location)
             }
             ParseErrorType::UnrecognizedToken(tok, Some(msg)) => CoreError::make_raw(
                 "Python parse error",
                 format!("Unrecognized token ({}, {})", tok, msg),
             )
-            .located(location),
+            .with_loc(location),
             ParseErrorType::UnrecognizedToken(tok, ..) => CoreError::make_raw(
                 "Python parse error",
                 format!("Unrecognized token ({})", tok),
             )
-            .located(location),
+            .with_loc(location),
             ParseErrorType::Lexical(err) => {
-                CoreError::make_raw("Python parse error", format!("{}", err)).located(location)
+                CoreError::make_raw("Python parse error", format!("{}", err)).with_loc(location)
             }
         }
     })?;

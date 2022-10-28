@@ -1,8 +1,11 @@
 pub mod ast;
 
-use std::convert::TryInto;
+use std::{
+    convert::{Infallible, TryInto},
+    rc::Rc,
+};
 
-use crate::core::{parse::ast as py, CoreError, Located};
+use crate::core::{parse::ast as py, CoreError, Located, Location};
 use ast::*;
 
 enum Error {
@@ -44,7 +47,11 @@ enum Error {
 }
 
 impl Error {
-    fn core(self) -> CoreError {
+    fn core(self, loc: Location) -> CoreError {
+        self.partial().located(loc)
+    }
+
+    fn partial(self) -> CoreError {
         match self {
             Self::ClassDefWithKeywords => CoreError::make_raw("class definition with keywords", ""),
             Self::ClassDefWithDecorators => CoreError::make_raw("class definition with decorators", ""),
@@ -181,25 +188,46 @@ impl Error {
     }
 }
 
-impl TryInto<Module> for py::Program {
+struct WithSrc<T> {
+    src: Rc<String>,
+    obj: T,
+}
+
+impl<T> WithSrc<T> {
+    fn new(src: &Rc<String>, obj: T) -> Self {
+        Self {
+            src: src.clone(),
+            obj,
+        }
+    }
+}
+
+impl TryInto<Module> for WithSrc<py::Program> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Module, Self::Error> {
-        let statements = self
+        let WithSrc { src, obj } = self;
+
+        let statements = obj
             .statements
             .into_iter()
-            .map(|statement| statement.try_into())
+            .map(|statement| WithSrc::new(&src, statement).try_into())
             .collect::<Result<Vec<TopLevelStatement>, CoreError>>()?;
         Ok(Module { statements })
     }
 }
 
-impl TryInto<TopLevelStatement> for py::Statement {
+impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<TopLevelStatement, Self::Error> {
-        let location = self.location;
-        match self.node {
+        let WithSrc {
+            src,
+            obj: py::Located { location, node },
+        } = self;
+        let location = Location::new(&src, location);
+
+        match node {
             // TODO importing something nested (like import seahorse.prelude) should get changed
             // into something else syntactically
             py::StatementType::Import { names } => Ok(TopLevelStatementObj::Import {
@@ -239,11 +267,11 @@ impl TryInto<TopLevelStatement> for py::Statement {
                         name,
                         body: body
                             .into_iter()
-                            .map(|statement| statement.try_into())
+                            .map(|statement| WithSrc::new(&src, statement).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
                         bases: bases
                             .into_iter()
-                            .map(|base| base.try_into())
+                            .map(|base| WithSrc::new(&src, base).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
                     })
                 }
@@ -261,46 +289,54 @@ impl TryInto<TopLevelStatement> for py::Statement {
                 } else {
                     Ok(TopLevelStatementObj::FunctionDef(FunctionDef {
                         name,
-                        params: (*args)
+                        params: WithSrc::new(&src, *args)
                             .try_into()
-                            .map_err(|err: CoreError| err.located(location))?,
+                            .map_err(|err: CoreError| err.updated(&location))?,
                         body: body
                             .into_iter()
-                            .map(|statement| statement.try_into())
+                            .map(|statement| WithSrc::new(&src, statement).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
                         decorator_list: decorator_list
                             .into_iter()
-                            .map(|decorator| decorator.try_into())
+                            .map(|decorator| WithSrc::new(&src, decorator).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
-                        returns: returns.map(|returns| returns.try_into()).transpose()?,
+                        returns: returns
+                            .map(|returns| WithSrc::new(&src, returns).try_into())
+                            .transpose()?,
                     }))
                 }
             }
-            py::StatementType::Expression { expression } => {
-                Ok(TopLevelStatementObj::Expression(expression.try_into()?))
-            }
+            py::StatementType::Expression { expression } => Ok(TopLevelStatementObj::Expression(
+                WithSrc::new(&src, expression).try_into()?,
+            )),
             _ => Err(Error::ArbitraryTopLevelStatementObj),
         }
-        .map(|ok| Located(location, ok))
-        .map_err(|err| err.core().located(location))
+        .map(|ok| Located(location.clone(), ok))
+        .map_err(|err| err.core(location))
     }
 }
 
-impl TryInto<ClassDefStatement> for py::Statement {
+impl TryInto<ClassDefStatement> for WithSrc<py::Statement> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<ClassDefStatement, Self::Error> {
-        let location = self.location;
-        match self.node {
+        let WithSrc {
+            src,
+            obj: py::Located { location, node },
+        } = self;
+        let location = Location::new(&src, location);
+
+        match node {
             py::StatementType::Assign { mut targets, value } => {
                 if targets.len() == 1 {
-                    let Located(_, target) = targets.pop().unwrap().try_into()?;
+                    let Located(_, target) =
+                        WithSrc::new(&src, targets.pop().unwrap()).try_into()?;
 
                     match target {
                         ExpressionObj::Id(name) => Ok(ClassDefStatementObj::FieldDef {
                             name,
                             ty: None,
-                            value: Some(value.try_into()?),
+                            value: Some(WithSrc::new(&src, value).try_into()?),
                         }),
                         _ => Err(Error::ArbitraryClassDefStatement),
                     }
@@ -315,8 +351,10 @@ impl TryInto<ClassDefStatement> for py::Statement {
             } => match target.node {
                 py::ExpressionType::Identifier { name } => Ok(ClassDefStatementObj::FieldDef {
                     name,
-                    ty: Some((*annotation).try_into()?),
-                    value: value.map(|value| value.try_into()).transpose()?,
+                    ty: Some(WithSrc::new(&src, *annotation).try_into()?),
+                    value: value
+                        .map(|value| WithSrc::new(&src, value).try_into())
+                        .transpose()?,
                 }),
                 _ => Err(Error::ArbitraryClassDefStatement),
             },
@@ -333,43 +371,47 @@ impl TryInto<ClassDefStatement> for py::Statement {
                 } else {
                     Ok(ClassDefStatementObj::MethodDef(FunctionDef {
                         name,
-                        params: (*args)
+                        params: WithSrc::new(&src, *args)
                             .try_into()
-                            .map_err(|err: CoreError| err.located(location))?,
+                            .map_err(|err: CoreError| err.updated(&location))?,
                         body: body
                             .into_iter()
-                            .map(|statement| statement.try_into())
+                            .map(|statement| WithSrc::new(&src, statement).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
                         decorator_list: decorator_list
                             .into_iter()
-                            .map(|decorator| decorator.try_into())
+                            .map(|decorator| WithSrc::new(&src, decorator).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
-                        returns: returns.map(|returns| returns.try_into()).transpose()?,
+                        returns: returns
+                            .map(|returns| WithSrc::new(&src, returns).try_into())
+                            .transpose()?,
                     }))
                 }
             }
             _ => Err(Error::ArbitraryClassDefStatement),
         }
-        .map(|ok| Located(location, ok))
-        .map_err(|err| err.core().located(location))
+        .map(|ok| Located(location.clone(), ok))
+        .map_err(|err| err.core(location))
     }
 }
 
-impl TryInto<Params> for py::Parameters {
+impl TryInto<Params> for WithSrc<py::Parameters> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Params, Self::Error> {
-        if self.posonlyargs_count > 0
-            || self.kwonlyargs.len() > 0
-            || self.vararg != py::Varargs::None
-            || self.kwarg != py::Varargs::None
-            || self.defaults.len() > 0
-            || self.kw_defaults.len() > 0
+        let WithSrc { src, obj } = self;
+
+        if obj.posonlyargs_count > 0
+            || obj.kwonlyargs.len() > 0
+            || obj.vararg != py::Varargs::None
+            || obj.kwarg != py::Varargs::None
+            || obj.defaults.len() > 0
+            || obj.kw_defaults.len() > 0
         {
-            Err(Error::ArbitraryParams.core())
+            Err(Error::ArbitraryParams.partial())
         } else {
             let mut is_instance_method = false;
-            if let Some(arg) = self.args.get(0) {
+            if let Some(arg) = obj.args.get(0) {
                 if arg.annotation == None && &arg.arg == "self" {
                     is_instance_method = true;
                 }
@@ -377,58 +419,66 @@ impl TryInto<Params> for py::Parameters {
 
             Ok(Params {
                 is_instance_method,
-                params: self
+                params: obj
                     .args
                     .into_iter()
                     .skip(if is_instance_method { 1 } else { 0 })
-                    .map(|arg| arg.try_into())
+                    .map(|arg| WithSrc::new(&src, arg).try_into())
                     .collect::<Result<_, CoreError>>()?,
             })
         }
     }
 }
 
-impl TryInto<Param> for py::Parameter {
+impl TryInto<Param> for WithSrc<py::Parameter> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Param, Self::Error> {
-        if let Some(annotation) = self.annotation {
+        let WithSrc { src, obj } = self;
+        let location = Location::new(&src, obj.location);
+
+        if let Some(annotation) = obj.annotation {
             Ok(Located(
-                self.location,
+                location,
                 ParamObj {
-                    arg: self.arg,
-                    annotation: (*annotation).try_into()?,
+                    arg: obj.arg,
+                    annotation: WithSrc::new(&src, *annotation).try_into()?,
                 },
             ))
         } else {
-            Err(Error::ParamWithoutType.core().located(self.location))
+            Err(Error::ParamWithoutType.core(location))
         }
     }
 }
 
-impl TryInto<Expression> for py::Expression {
+impl TryInto<Expression> for WithSrc<py::Expression> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Expression, Self::Error> {
-        let location = self.location;
-        match self.node {
+        let WithSrc {
+            src,
+            obj: py::Located { location, node },
+        } = self;
+        let location = Location::new(&src, location);
+
+        match node {
             py::ExpressionType::BoolOp { op, values } => {
                 // Converts a boolean chain into a binop tree
-                let op: Operator = op.try_into()?;
+                let op: Operator = op.try_into().unwrap();
 
                 let mut values = values.into_iter();
-                let first: Expression = values.next().unwrap().try_into()?;
+                let first: Expression = WithSrc::new(&src, values.next().unwrap()).try_into()?;
                 let mut res = Located(
                     first.0.clone(),
                     ExpressionObj::BinOp {
                         left: Box::new(first),
                         op: op.clone(),
-                        right: Box::new(values.next().unwrap().try_into()?),
+                        right: Box::new(WithSrc::new(&src, values.next().unwrap()).try_into()?),
                     },
                 );
 
                 for value in values {
-                    let value: Expression = value.try_into()?;
+                    let value: Expression = WithSrc::new(&src, value).try_into()?;
                     res = Located(
                         value.0.clone(),
                         ExpressionObj::BinOp {
@@ -442,33 +492,35 @@ impl TryInto<Expression> for py::Expression {
                 Ok(res.1)
             }
             py::ExpressionType::Binop { a, op, b } => Ok(ExpressionObj::BinOp {
-                left: Box::new((*a).try_into()?),
-                op: op.try_into()?,
-                right: Box::new((*b).try_into()?),
+                left: Box::new(WithSrc::new(&src, *a).try_into()?),
+                op: op
+                    .try_into()
+                    .map_err(|err: CoreError| err.updated(&location))?,
+                right: Box::new(WithSrc::new(&src, *b).try_into()?),
             }),
             py::ExpressionType::Subscript { a, b } => Ok(ExpressionObj::Index {
-                value: Box::new((*a).try_into()?),
-                index: Box::new((*b).try_into()?),
+                value: Box::new(WithSrc::new(&src, *a).try_into()?),
+                index: Box::new(WithSrc::new(&src, *b).try_into()?),
             }),
             py::ExpressionType::Unop { op, a } => Ok(ExpressionObj::UnOp {
-                op: op.try_into()?,
-                value: Box::new((*a).try_into()?),
+                op: op.try_into().unwrap(),
+                value: Box::new(WithSrc::new(&src, *a).try_into()?),
             }),
             py::ExpressionType::Compare { vals, ops } => {
                 if ops.len() == 1 {
                     let mut vals = vals.into_iter();
                     let mut ops = ops.into_iter();
                     Ok(ExpressionObj::BinOp {
-                        left: Box::new(vals.next().unwrap().try_into()?),
-                        op: ops.next().unwrap().try_into()?,
-                        right: Box::new(vals.next().unwrap().try_into()?),
+                        left: Box::new(WithSrc::new(&src, vals.next().unwrap()).try_into()?),
+                        op: ops.next().unwrap().try_into().unwrap(),
+                        right: Box::new(WithSrc::new(&src, vals.next().unwrap()).try_into()?),
                     })
                 } else {
                     Err(Error::CompareChain)
                 }
             }
             py::ExpressionType::Attribute { value, name } => Ok(ExpressionObj::Attribute {
-                value: Box::new((*value).try_into()?),
+                value: Box::new(WithSrc::new(&src, *value).try_into()?),
                 name,
             }),
             py::ExpressionType::Call {
@@ -476,8 +528,8 @@ impl TryInto<Expression> for py::Expression {
                 args,
                 keywords,
             } => Ok(ExpressionObj::Call {
-                function: Box::new((*function).try_into()?),
-                args: (args, keywords).try_into()?,
+                function: Box::new(WithSrc::new(&src, *function).try_into()?),
+                args: WithSrc::new(&src, (args, keywords)).try_into()?,
             }),
             py::ExpressionType::Number { value } => match value {
                 py::Number::Integer { value } => value
@@ -491,18 +543,18 @@ impl TryInto<Expression> for py::Expression {
             py::ExpressionType::List { elements } => Ok(ExpressionObj::List(
                 elements
                     .into_iter()
-                    .map(|element| element.try_into())
+                    .map(|element| WithSrc::new(&src, element).try_into())
                     .collect::<Result<Vec<_>, CoreError>>()?,
             )),
             py::ExpressionType::Tuple { elements } => Ok(ExpressionObj::Tuple(
                 elements
                     .into_iter()
-                    .map(|element| element.try_into())
+                    .map(|element| WithSrc::new(&src, element).try_into())
                     .collect::<Result<Vec<_>, CoreError>>()?,
             )),
             py::ExpressionType::Comprehension { kind, generators } => match *kind {
                 py::ComprehensionKind::List { element } => Ok(ExpressionObj::Comprehension {
-                    element: Box::new(element.try_into()?),
+                    element: Box::new(WithSrc::new(&src, element).try_into()?),
                     parts: {
                         let mut parts = vec![];
 
@@ -514,15 +566,16 @@ impl TryInto<Expression> for py::Expression {
                                 ifs,
                                 is_async,
                             } = generator;
+                            let location = Location::new(&src, location);
 
                             if is_async {
-                                return Err(Error::Async.core().located(location));
+                                return Err(Error::Async.core(location));
                             }
 
                             parts.push(ComprehensionPart::For {
-                                target: target.try_into()?,
+                                target: WithSrc::new(&src, target).try_into()?,
                                 iter: {
-                                    let iter: Expression = iter.try_into()?;
+                                    let iter: Expression = WithSrc::new(&src, iter).try_into()?;
                                     Located(
                                         iter.0.clone(),
                                         ExpressionObj::Iter { value: iter.into() },
@@ -535,7 +588,7 @@ impl TryInto<Expression> for py::Expression {
                                     .into_iter()
                                     .map(|cond| {
                                         Ok(ComprehensionPart::If {
-                                            cond: cond.try_into()?,
+                                            cond: WithSrc::new(&src, cond).try_into()?,
                                         })
                                     })
                                     .collect::<Result<Vec<_>, CoreError>>()?,
@@ -552,7 +605,7 @@ impl TryInto<Expression> for py::Expression {
                 py::StringGroup::Joined { values } => Ok(ExpressionObj::FStr {
                     parts: values
                         .into_iter()
-                        .map(|part| part.try_into())
+                        .map(|part| WithSrc::new(&src, part).try_into())
                         .collect::<Result<Vec<_>, CoreError>>()?,
                 }),
                 _ => panic!("Encountered an unexpected syntax element"),
@@ -571,55 +624,65 @@ impl TryInto<Expression> for py::Expression {
             py::ExpressionType::Bytes { .. } => Err(Error::ExpressionBytes),
             py::ExpressionType::Lambda { .. } => Err(Error::ExpressionLambda),
             py::ExpressionType::IfExpression { test, body, orelse } => Ok(ExpressionObj::Ternary {
-                test: Box::new((*test).try_into()?),
-                body: Box::new((*body).try_into()?),
-                orelse: Box::new((*orelse).try_into()?),
+                test: Box::new(WithSrc::new(&src, *test).try_into()?),
+                body: Box::new(WithSrc::new(&src, *body).try_into()?),
+                orelse: Box::new(WithSrc::new(&src, *orelse).try_into()?),
             }),
             py::ExpressionType::NamedExpression { .. } => Err(Error::ExpressionNamed),
             py::ExpressionType::Ellipsis => Err(Error::ExpressionEllipsis),
         }
-        .map(|ok| Located(location, ok))
-        .map_err(|err| err.core().located(location))
+        .map(|ok| Located(location.clone(), ok))
+        .map_err(|err| err.core(location))
     }
 }
 
-impl TryInto<Args> for (Vec<py::Expression>, Vec<py::Keyword>) {
+impl TryInto<Args> for WithSrc<(Vec<py::Expression>, Vec<py::Keyword>)> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Args, Self::Error> {
-        let (pos, kw) = self;
+        let WithSrc {
+            src,
+            obj: (pos, kw),
+        } = self;
+
         Ok(Args {
             pos: pos
                 .into_iter()
-                .map(|arg| arg.try_into())
+                .map(|arg| WithSrc::new(&src, arg).try_into())
                 .collect::<Result<Vec<_>, CoreError>>()?,
             kw: kw
                 .into_iter()
-                .map(|py::Keyword { name, value }| match value.try_into() {
-                    Ok(value) => Ok((name.unwrap(), value)),
-                    Err(err) => Err(err),
-                })
+                .map(
+                    |py::Keyword { name, value }| match WithSrc::new(&src, value).try_into() {
+                        Ok(value) => Ok((name.unwrap(), value)),
+                        Err(err) => Err(err),
+                    },
+                )
                 .collect::<Result<Vec<_>, CoreError>>()?,
         })
     }
 }
 
-impl TryInto<FStrPart> for py::StringGroup {
+impl TryInto<FStrPart> for WithSrc<py::StringGroup> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<FStrPart, Self::Error> {
-        match self {
+        let WithSrc { src, obj } = self;
+
+        match obj {
             py::StringGroup::Constant { value } => Ok(FStrPart::Str(value)),
             py::StringGroup::FormattedValue {
                 value,
                 conversion,
                 spec,
             } => {
-                let location = value.location;
+                let location = Location::new(&src, value.location);
                 if conversion.is_some() || spec.is_some() {
-                    Err(Error::FStrWithSpec.core().located(location))
+                    Err(Error::FStrWithSpec.core(location))
                 } else {
-                    Ok(FStrPart::ExpressionObj((*value).try_into()?))
+                    Ok(FStrPart::ExpressionObj(
+                        WithSrc::new(&src, *value).try_into()?,
+                    ))
                 }
             }
             _ => panic!("Encountered an unexpected syntax element"),
@@ -627,18 +690,23 @@ impl TryInto<FStrPart> for py::StringGroup {
     }
 }
 
-impl TryInto<TyExpression> for py::Expression {
+impl TryInto<TyExpression> for WithSrc<py::Expression> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<TyExpression, Self::Error> {
-        let location = self.location;
-        match self.node {
+        let WithSrc {
+            src,
+            obj: py::Located { location, node },
+        } = self;
+        let location = Location::new(&src, location);
+
+        match node {
             py::ExpressionType::Subscript { a, b } => {
-                let Located(_, base) = (*a).try_into()?;
+                let Located(_, base) = WithSrc::new(&src, *a).try_into()?;
                 let base = match base {
                     TyExpressionObj::Generic { base, params } if params.len() == 0 => base,
                     _ => {
-                        return Err(Error::ArbitraryTyExpression.core().located(location));
+                        return Err(Error::ArbitraryTyExpression.core(location));
                     }
                 };
 
@@ -652,12 +720,12 @@ impl TryInto<TyExpression> for py::Expression {
                         expression => vec![expression],
                     }
                     .into_iter()
-                    .map(|param| param.try_into())
+                    .map(|param| WithSrc::new(&src, param).try_into())
                     .collect::<Result<_, CoreError>>()?,
                 })
             }
             py::ExpressionType::Attribute { value, name } => {
-                let Located(_, base) = (*value).try_into()?;
+                let Located(_, base) = WithSrc::new(&src, *value).try_into()?;
                 match base {
                     TyExpressionObj::Generic { mut base, params } => {
                         base.push(name);
@@ -676,85 +744,98 @@ impl TryInto<TyExpression> for py::Expression {
                 value
                     .to_str_radix(10)
                     .parse()
-                    .map_err(|_| Error::ArbitraryTyExpression.core().located(location))?,
+                    .map_err(|_| Error::ArbitraryTyExpression.core(location.clone()))?,
             )),
             _ => Err(Error::ArbitraryTyExpression),
         }
-        .map(|ok| Located(location, ok))
-        .map_err(|err| err.core().located(location))
+        .map(|ok| Located(location.clone(), ok))
+        .map_err(|err| err.core(location))
     }
 }
 
-impl TryInto<Statement> for py::Statement {
+impl TryInto<Statement> for WithSrc<py::Statement> {
     type Error = CoreError;
 
     fn try_into(self) -> Result<Statement, Self::Error> {
-        let location = self.location;
-        match self.node {
+        let WithSrc {
+            src,
+            obj: py::Located { location, node },
+        } = self;
+        let location = Location::new(&src, location);
+
+        match node {
             py::StatementType::Break => Ok(StatementObj::Break),
             py::StatementType::Continue => Ok(StatementObj::Continue),
             py::StatementType::Return { value } => Ok(StatementObj::Return {
-                value: value.map(|value| value.try_into()).transpose()?,
+                value: value
+                    .map(|value| WithSrc::new(&src, value).try_into())
+                    .transpose()?,
             }),
             py::StatementType::Pass => Ok(StatementObj::Pass),
             py::StatementType::Assert { test, msg } => Ok(StatementObj::Assert {
-                test: test.try_into()?,
-                msg: msg.map(|msg| msg.try_into()).transpose()?,
+                test: WithSrc::new(&src, test).try_into()?,
+                msg: msg
+                    .map(|msg| WithSrc::new(&src, msg).try_into())
+                    .transpose()?,
             }),
             py::StatementType::Assign { mut targets, value } => Ok(StatementObj::Assign {
                 target: if targets.len() == 1 {
-                    targets.pop().unwrap().try_into()?
+                    WithSrc::new(&src, targets.pop().unwrap()).try_into()?
                 } else {
                     Located(
                         location.clone(),
                         ExpressionObj::Tuple(
                             targets
                                 .into_iter()
-                                .map(|target| target.try_into())
+                                .map(|target| WithSrc::new(&src, target).try_into())
                                 .collect::<Result<Vec<_>, CoreError>>()?,
                         ),
                     )
                 },
-                value: value.try_into()?,
+                value: WithSrc::new(&src, value).try_into()?,
             }),
             py::StatementType::AugAssign { target, op, value } => Ok(StatementObj::OpAssign {
-                target: (*target).try_into()?,
-                op: op.try_into()?,
-                value: (*value).try_into()?,
+                target: WithSrc::new(&src, *target).try_into()?,
+                op: op
+                    .try_into()
+                    .map_err(|err: CoreError| err.updated(&location))?,
+                value: WithSrc::new(&src, *value).try_into()?,
             }),
             py::StatementType::AnnAssign {
                 target,
                 annotation,
                 value,
             } => Ok(StatementObj::TyAssign {
-                target: (*target).try_into()?,
-                ty: (*annotation).try_into()?,
-                value: value.map(|value| value.try_into()).transpose()?,
+                target: WithSrc::new(&src, *target).try_into()?,
+                ty: WithSrc::new(&src, *annotation).try_into()?,
+                value: value
+                    .map(|value| WithSrc::new(&src, value).try_into())
+                    .transpose()?,
             }),
             py::StatementType::Expression { expression } => Ok(StatementObj::ExpressionObj {
-                expression: expression.try_into()?,
+                expression: WithSrc::new(&src, expression).try_into()?,
             }),
             py::StatementType::If { test, body, orelse } => Ok(StatementObj::If {
-                test: test.try_into()?,
+                test: WithSrc::new(&src, test).try_into()?,
                 body: body
                     .into_iter()
-                    .map(|statement| statement.try_into())
+                    .map(|statement| WithSrc::new(&src, statement).try_into())
                     .collect::<Result<_, CoreError>>()?,
                 orelse: orelse
                     .map(|orelse| {
                         orelse
                             .into_iter()
-                            .map(|statement| statement.try_into())
+                            .map(|statement| WithSrc::new(&src, statement).try_into())
                             .collect::<Result<_, CoreError>>()
                     })
                     .transpose()?,
             }),
             py::StatementType::While { test, body, orelse } => match orelse {
                 None => Ok(StatementObj::While {
-                    test: test.try_into()?,
+                    test: WithSrc::new(&src, test).try_into()?,
                     body: body
                         .into_iter()
-                        .map(|statement| statement.try_into())
+                        .map(|statement| WithSrc::new(&src, statement).try_into())
                         .collect::<Result<_, CoreError>>()?,
                 }),
                 _ => Err(Error::WhileWithOrelse),
@@ -772,14 +853,14 @@ impl TryInto<Statement> for py::Statement {
                     Err(Error::ForWithOrelse)
                 } else {
                     Ok(StatementObj::For {
-                        target: (*target).try_into()?,
+                        target: WithSrc::new(&src, *target).try_into()?,
                         iter: {
-                            let iter: Expression = (*iter).try_into()?;
+                            let iter: Expression = WithSrc::new(&src, *iter).try_into()?;
                             Located(iter.0.clone(), ExpressionObj::Iter { value: iter.into() })
                         },
                         body: body
                             .into_iter()
-                            .map(|statement| statement.try_into())
+                            .map(|statement| WithSrc::new(&src, statement).try_into())
                             .collect::<Result<_, CoreError>>()?,
                     })
                 }
@@ -796,8 +877,8 @@ impl TryInto<Statement> for py::Statement {
             py::StatementType::ClassDef { .. } => Err(Error::StatementClassDef),
             py::StatementType::FunctionDef { .. } => Err(Error::StatementFunctionDef),
         }
-        .map(|ok| Located(location, ok))
-        .map_err(|err| err.core().located(location))
+        .map(|ok| Located(location.clone(), ok))
+        .map_err(|err| err.core(location))
     }
 }
 
@@ -818,13 +899,13 @@ impl TryInto<Operator> for py::Operator {
             Self::BitXor => Operator::BitXor,
             Self::BitAnd => Operator::BitAnd,
             Self::FloorDiv => Operator::FloorDiv,
-            Self::MatMult => return Err(Error::OperatorMatMult.core()),
+            Self::MatMult => return Err(Error::OperatorMatMult.partial()),
         })
     }
 }
 
 impl TryInto<Operator> for py::BooleanOperator {
-    type Error = CoreError;
+    type Error = Infallible;
 
     fn try_into(self) -> Result<Operator, Self::Error> {
         Ok(match self {
@@ -835,7 +916,7 @@ impl TryInto<Operator> for py::BooleanOperator {
 }
 
 impl TryInto<Operator> for py::Comparison {
-    type Error = CoreError;
+    type Error = Infallible;
 
     fn try_into(self) -> Result<Operator, Self::Error> {
         Ok(match self {
@@ -854,7 +935,7 @@ impl TryInto<Operator> for py::Comparison {
 }
 
 impl TryInto<UnaryOperator> for py::UnaryOperator {
-    type Error = CoreError;
+    type Error = Infallible;
 
     fn try_into(self) -> Result<UnaryOperator, Self::Error> {
         Ok(match self {
@@ -866,6 +947,6 @@ impl TryInto<UnaryOperator> for py::UnaryOperator {
     }
 }
 
-pub fn clean(program: py::Program) -> Result<Module, CoreError> {
-    program.try_into()
+pub fn clean(program: py::Program, source: String) -> Result<Module, CoreError> {
+    WithSrc::new(&Rc::new(source), program).try_into()
 }

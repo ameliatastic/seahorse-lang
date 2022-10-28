@@ -355,7 +355,12 @@ impl<'a> Context<'a> {
 
         let returns = make_ty_expr(
             def_returns.unwrap_or(Located(
-                Location::default(),
+                // Location doesn't matter here I think
+                // (if it does then whoopsies)
+                Location::new(
+                    &Rc::new("".to_string()),
+                    rustpython_parser::location::Location::default(),
+                ),
                 ast::TyExpressionObj::Generic {
                     base: vec!["None".to_string()],
                     params: vec![],
@@ -591,7 +596,7 @@ impl<'a> Context<'a> {
                     _ => panic!(),
                 };
 
-                let order = order_args(&args, params, &expression.0)?;
+                let order = order_args(&args, params, &loc)?;
                 let mut args = vec![];
                 for arg in order.into_iter() {
                     match arg {
