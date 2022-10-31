@@ -15,6 +15,7 @@ pub enum Prelude {
     Array,
     Enum,
     Account,
+    Event,
     Signer,
     Empty,
     Program,
@@ -46,6 +47,7 @@ pub fn namespace() -> Namespace {
     let data = [
         ("Array", Prelude::Array),
         ("Enum", Prelude::Enum),
+        ("Event", Prelude::Event),
         ("Account", Prelude::Account),
         ("Signer", Prelude::Signer),
         ("Empty", Prelude::Empty),
@@ -93,6 +95,7 @@ impl BuiltinSource for Prelude {
             Self::Array => "Array",
             Self::Enum => "Enum",
             Self::Account => "Account",
+            Self::Event => "Event",
             Self::Signer => "Signer",
             Self::Empty => "Empty",
             Self::Program => "Program",

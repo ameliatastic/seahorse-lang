@@ -677,6 +677,14 @@ class Account(AccountWithKey):
         @param amount: The amount (in lamports, not SOL) to transfer.
         """
 
+class Event:
+    """Anchor event that clients can listen for"""
+
+    def emit(self):
+        """
+        Emit the event to the blockchain
+        """
+
 class Signer(AccountWithKey):
     """Instruction signer."""
 

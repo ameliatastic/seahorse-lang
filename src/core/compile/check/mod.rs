@@ -204,7 +204,7 @@ impl Ty {
                 Python::Bool | Python::Int | Python::None | Python::Str | Python::Tuple => false,
                 _ => true,
             },
-            Ty::Generic(TyName::Defined(_, DefinedType::Struct | DefinedType::Account), _) => true,
+            Ty::Generic(TyName::Defined(_, DefinedType::Struct | DefinedType::Account | DefinedType::Event), _) => true,
             Ty::Generic(TyName::Defined(_, DefinedType::Enum), _) => false,
             _ => false,
         }
@@ -343,6 +343,7 @@ pub enum DefinedType {
     Struct,
     Account,
     Enum,
+    Event,
 }
 
 impl std::fmt::Display for TyName {
@@ -734,6 +735,30 @@ impl<'a> Context<'a> {
             Ty::Generic(t, _) => match t {
                 TyName::Builtin(x) => x.attr(attr),
                 TyName::Defined(path, DefinedType::Struct | DefinedType::Enum) => self.defined_attr(&path, attr),
+                TyName::Defined(path, DefinedType::Event) => self.defined_attr(&path, attr).or_else(|| {
+                    match attr.as_str() {
+                        "emit" => Some((
+                            Ty::Anonymous(0),
+                            Ty::new_function(
+                                vec![],
+                                Ty::Transformed(
+                                    Box::new(Ty::Never),
+                                    Transformation::new(|mut expr| {
+                                        let event = match1!(expr.obj, ExpressionObj::Call { function, .. } => *function);
+                                        let event = match1!(event.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                                        expr.obj = ExpressionObj::Rendered(quote! {
+                                            #event.__emit__();
+                                        });
+
+                                        Ok(Transformed::Expression(expr))
+                                    })
+                                )
+                            )
+                        )),
+                        _ => None
+                    }
+                }),
                 TyName::Defined(path, DefinedType::Account) => self.defined_attr(&path, attr).or_else(|| {
                     match attr.as_str() {
                         "key" => Some((
@@ -790,10 +815,7 @@ impl<'a> Context<'a> {
             },
             Ty::Type(t, _) => match t {
                 TyName::Builtin(x) => x.static_attr(attr).map(|t| (Ty::Anonymous(0), t)),
-                TyName::Defined(path, DefinedType::Struct | DefinedType::Enum) => self.defined_static_attr(&path, attr),
-                TyName::Defined(path, DefinedType::Account) => {
-                    self.defined_static_attr(&path, attr)
-                }
+                TyName::Defined(path, DefinedType::Struct | DefinedType::Enum | DefinedType::Account | DefinedType::Event) => self.defined_static_attr(&path, attr),
             },
             Ty::Path(mut abs) => match self.sign_output.namespace_output.tree.get(&abs) {
                 Some(Tree::Leaf(namespace)) => match namespace.get(attr) {
@@ -820,6 +842,18 @@ impl<'a> Context<'a> {
                                 Ty::Anonymous(0),
                                 Ty::Type(TyName::Defined(abs, DefinedType::Account), None),
                             )),
+                            Some(Signature::Class(ClassSignature::Struct(sig @ StructSignature {
+                                is_event: true,
+                                ..
+                            }))) => {
+                                Some((
+                                    Ty::Anonymous(0),
+                                    Ty::Type(
+                                        TyName::Defined(abs.clone(), DefinedType::Event),
+                                        sig.constructor(TyName::Defined(abs, DefinedType::Event))
+                                    )
+                                ))
+                            }
                             Some(Signature::Class(ClassSignature::Struct(sig @ StructSignature {
                                 is_account: false,
                                 ..
@@ -1387,6 +1421,21 @@ impl<'a> Context<'a> {
                                 )?,
                                 Some(Signature::Class(ClassSignature::Struct(
                                     sig @ StructSignature {
+                                        is_event: true, ..
+                                    },
+                                ))) => self.unify(
+                                    expr_ty,
+                                    Ty::Type(
+                                        TyName::Defined(path.clone(), DefinedType::Event),
+                                        sig.constructor(TyName::Defined(
+                                            path.clone(),
+                                            DefinedType::Event,
+                                        )),
+                                    ),
+                                    loc,
+                                )?,
+                                Some(Signature::Class(ClassSignature::Struct(
+                                    sig @ StructSignature {
                                         is_account: false, ..
                                     },
                                 ))) => self.unify(
@@ -1441,6 +1490,21 @@ impl<'a> Context<'a> {
                             }))) => self.unify(
                                 expr_ty,
                                 Ty::Type(TyName::Defined(path.clone(), DefinedType::Account), None),
+                                loc,
+                            )?,
+                            Some(Signature::Class(ClassSignature::Struct(
+                                sig @ StructSignature {
+                                    is_event: true, ..
+                                },
+                            ))) => self.unify(
+                                expr_ty,
+                                Ty::Type(
+                                    TyName::Defined(path.clone(), DefinedType::Event),
+                                    sig.constructor(TyName::Defined(
+                                        path.clone(),
+                                        DefinedType::Event,
+                                    )),
+                                ),
                                 loc,
                             )?,
                             Some(Signature::Class(ClassSignature::Struct(
@@ -2094,8 +2158,14 @@ impl TryFrom<SignOutput> for CheckOutput {
                                                 let mut full_name = path.clone();
                                                 full_name.push(name.clone());
 
+                                                let defined_type = if class_signature.is_event {
+                                                    DefinedType::Event
+                                                } else {
+                                                    DefinedType::Struct
+                                                };
+
                                                 Some(Ty::Generic(
-                                                    TyName::Defined(full_name, DefinedType::Struct),
+                                                    TyName::Defined(full_name, defined_type),
                                                     vec![]
                                                 ))
                                             } else {
