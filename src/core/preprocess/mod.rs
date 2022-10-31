@@ -242,13 +242,14 @@ impl ModuleTreeBuilder {
                             path: symbol_path,
                             ..
                         } => {
-                            if *level >= path.path.len() {
+                            if *level > path.path.len() {
                                 return Err(Error::PathOutsideRoot(path, *level)
                                     .core()
                                     .located(loc.clone()));
                             }
 
                             let mut path = path.clone();
+                            // Pop the module name
                             path.pop();
                             for _ in 0..*level {
                                 path.pop();

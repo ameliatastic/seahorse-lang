@@ -6,7 +6,7 @@ use clap::Args;
 use owo_colors::OwoColorize;
 use std::{
     error::Error,
-    fs::{DirBuilder, File},
+    fs::{DirBuilder, File, remove_dir_all},
     io::{Read, Write},
     path::PathBuf,
     process::Command,
@@ -80,6 +80,7 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 .join(program_name.clone())
                 .join("src");
 
+            remove_dir_all(&src)?;
             write_src_tree(&tree, src)?;
 
             let anchor_output = Command::new("anchor")
