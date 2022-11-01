@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `size` function that returns the size of a string (for now) in bytes
 - Allow setting `space` or `padding` on account init to customise account size
 - Support for Anchor events
+- Allow using pubkeys as seeds
 
 ### Changed
 
