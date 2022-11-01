@@ -9,6 +9,7 @@ use crate::core::{parse::ast as py, CoreError, Located, Location};
 use ast::*;
 
 enum Error {
+    ImportAlias,
     ClassDefWithKeywords,
     ClassDefWithDecorators,
     Async,
@@ -28,7 +29,6 @@ enum Error {
     ExpressionSlice,
     ExpressionBytes,
     ExpressionLambda,
-    ExpressionIf,
     ExpressionNamed,
     ExpressionEllipsis,
     FStrWithSpec,
@@ -53,6 +53,7 @@ impl Error {
 
     fn partial(self) -> CoreError {
         match self {
+            Self::ImportAlias => CoreError::make_raw("imports aliases are currently not supported", ""),
             Self::ClassDefWithKeywords => CoreError::make_raw("class definition with keywords", ""),
             Self::ClassDefWithDecorators => CoreError::make_raw("class definition with decorators", ""),
             Self::Async => CoreError::make_raw("functions may not be async", ""),
@@ -118,10 +119,6 @@ impl Error {
             ),
             Self::ExpressionLambda => CoreError::make_raw(
                 "lambda functions are not supported",
-                ""
-            ),
-            Self::ExpressionIf => CoreError::make_raw(
-                "ternaries are not supported",
                 ""
             ),
             Self::ExpressionNamed => CoreError::make_raw(
@@ -233,8 +230,11 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
             py::StatementType::Import { names } => Ok(TopLevelStatementObj::Import {
                 symbols: names
                     .into_iter()
-                    .map(|py::ImportSymbol { symbol, alias }| ImportSymbol { symbol, alias })
-                    .collect(),
+                    .map(|py::ImportSymbol { symbol, alias }| match alias {
+                        None => Ok(ImportSymbol { symbol, alias: None }),
+                        _ => Err(Error::ImportAlias.core(location.clone()))
+                    })
+                    .collect::<Result<_, _>>()?,
             }),
             py::StatementType::ImportFrom {
                 level,
@@ -248,8 +248,11 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 },
                 symbols: names
                     .into_iter()
-                    .map(|py::ImportSymbol { symbol, alias }| ImportSymbol { symbol, alias })
-                    .collect(),
+                    .map(|py::ImportSymbol { symbol, alias }| match alias {
+                        None => Ok(ImportSymbol { symbol, alias: None }),
+                        _ => Err(Error::ImportAlias.core(location.clone()))
+                    })
+                    .collect::<Result<_, _>>()?,
             }),
             py::StatementType::ClassDef {
                 name,
