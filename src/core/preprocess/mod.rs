@@ -186,15 +186,18 @@ impl ComboPath {
 
     fn is_package(&self) -> bool {
         let fs_path = self.get_fs_package_path();
-        let init_fs_path = fs_path.join("__init__.py");
-
-        return fs_path.is_dir() && init_fs_path.is_file();
+        return fs_path.is_dir();
     }
 }
 
 impl Display for ComboPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} + {}", self.fs_base.display(), path_to_string(&self.path))
+        write!(
+            f,
+            "{} + {}",
+            self.fs_base.display(),
+            path_to_string(&self.path)
+        )
     }
 }
 
@@ -227,7 +230,8 @@ impl ModuleTreeBuilder {
                             for ca::ImportSymbol { symbol, .. } in symbols.iter() {
                                 // Try a Seahorse import
                                 {
-                                    let mut path = ComboPath::new(vec!["sh".to_string()], PathBuf::new());
+                                    let mut path =
+                                        ComboPath::new(vec!["sh".to_string()], PathBuf::new());
                                     path.push(symbol.clone());
 
                                     if self.tree.get(&path.get_path()).is_some() {
@@ -240,7 +244,7 @@ impl ModuleTreeBuilder {
                                     let mut path = path.clone();
                                     path.pop();
                                     path.push(symbol.clone());
-    
+
                                     if path.is_module() {
                                         let module = load_module(path.get_fs_module_path())?;
                                         self.add_module(module, path)?;
@@ -267,18 +271,23 @@ impl ModuleTreeBuilder {
                                     .located(loc.clone()));
                             }
 
-                            if *level == path.path.len() && symbol_path.get(0).unwrap() == "seahorse" {
-                                return Err(Error::RelativeSeahorseImport.core().located(loc.clone()));
+                            if *level == path.path.len()
+                                && symbol_path.get(0).unwrap() == "seahorse"
+                            {
+                                return Err(Error::RelativeSeahorseImport
+                                    .core()
+                                    .located(loc.clone()));
                             }
 
                             // (Loop used so that nested scopes can immediately break here)
                             'done: loop {
                                 // Try a Seahorse import
                                 if *level == 0 {
-                                    let mut path = ComboPath::new(vec!["sh".to_string()], PathBuf::new());
+                                    let mut path =
+                                        ComboPath::new(vec!["sh".to_string()], PathBuf::new());
                                     for part in symbol_path.iter() {
                                         path.push(part.clone());
-                                        
+
                                         if self.tree.get(&path.get_path()).is_some() {
                                             break 'done;
                                         }
@@ -293,17 +302,17 @@ impl ModuleTreeBuilder {
                                     for _ in 0..*level {
                                         path.pop();
                                     }
-        
+
                                     for part in symbol_path.iter() {
                                         path.push(part.clone());
-    
+
                                         if path.is_module() {
                                             let module = load_module(path.get_fs_module_path())?;
                                             self.add_module(module, path)?;
                                             break 'done;
                                         }
                                     }
-    
+
                                     if path.is_package() {
                                         self.add_package(path)?;
                                     } else {
@@ -339,7 +348,7 @@ impl ModuleTreeBuilder {
             let entry = entry.map_err(|_| Error::Os.core())?;
             let name = from_os_string(entry.file_name().as_os_str());
 
-            if entry.path().is_file() && name.ends_with(".py") && name != "__init__.py" {
+            if entry.path().is_file() && name.ends_with(".py") {
                 let name = name.strip_suffix(".py").unwrap().to_string();
                 let mut path = path.clone();
                 path.push(name);

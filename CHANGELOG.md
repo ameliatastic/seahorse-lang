@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow storing arrays of enums on an account
 - New `size` function that returns the size of a string (for now) in bytes
 - Allow setting `space` or `padding` on account init to customise account size
+- Support for importing from local files
 
 ### Changed
 

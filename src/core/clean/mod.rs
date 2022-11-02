@@ -231,8 +231,11 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 symbols: names
                     .into_iter()
                     .map(|py::ImportSymbol { symbol, alias }| match alias {
-                        None => Ok(ImportSymbol { symbol, alias: None }),
-                        _ => Err(Error::ImportAlias.core(location.clone()))
+                        None => Ok(ImportSymbol {
+                            symbol,
+                            alias: None,
+                        }),
+                        _ => Err(Error::ImportAlias.core(location.clone())),
                     })
                     .collect::<Result<_, _>>()?,
             }),
@@ -249,8 +252,11 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 symbols: names
                     .into_iter()
                     .map(|py::ImportSymbol { symbol, alias }| match alias {
-                        None => Ok(ImportSymbol { symbol, alias: None }),
-                        _ => Err(Error::ImportAlias.core(location.clone()))
+                        None => Ok(ImportSymbol {
+                            symbol,
+                            alias: None,
+                        }),
+                        _ => Err(Error::ImportAlias.core(location.clone())),
                     })
                     .collect::<Result<_, _>>()?,
             }),

@@ -1148,6 +1148,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
+                // Prune all Seahorse builtins
                 artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);

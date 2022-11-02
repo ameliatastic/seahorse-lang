@@ -6,7 +6,7 @@ use clap::Args;
 use owo_colors::OwoColorize;
 use std::{
     error::Error,
-    fs::{DirBuilder, File, remove_dir_all},
+    fs::{remove_dir_all, DirBuilder, File},
     io::{Read, Write},
     path::PathBuf,
     process::Command,
