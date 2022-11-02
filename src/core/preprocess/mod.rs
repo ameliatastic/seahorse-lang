@@ -19,6 +19,7 @@ use super::compile::builtin::prelude::path_to_string;
 enum Error {
     CouldNotAddModule,
     CouldNotFind(ComboPath),
+    RelativeSeahorseImport,
     PathOutsideRoot(ComboPath, usize),
     Os,
 }
@@ -33,6 +34,10 @@ impl Error {
             Self::CouldNotFind(path) => CoreError::make_raw(
                 format!("could not find import at {}", path),
                 "",
+            ),
+            Self::RelativeSeahorseImport => CoreError::make_raw(
+                "attempted to import local Seahorse files",
+                "Help: `seahorse` is a builtin package, you should import it like a regular Python package:\n\n    from seahorse.prelude import *"
             ),
             Self::PathOutsideRoot(path, level) => CoreError::make_raw(
                 "relative import would go outside of source code root",
@@ -262,7 +267,11 @@ impl ModuleTreeBuilder {
                                     .located(loc.clone()));
                             }
 
-                            // (Loop used so that nested scopes can immediately break here.)
+                            if *level == path.path.len() && symbol_path.get(0).unwrap() == "seahorse" {
+                                return Err(Error::RelativeSeahorseImport.core().located(loc.clone()));
+                            }
+
+                            // (Loop used so that nested scopes can immediately break here)
                             'done: loop {
                                 // Try a Seahorse import
                                 if *level == 0 {
