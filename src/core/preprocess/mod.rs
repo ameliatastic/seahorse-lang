@@ -8,10 +8,13 @@ use crate::core::{
 use std::{
     collections::HashMap,
     ffi::OsStr,
+    fmt::{self, Display, Formatter},
     fs::{read_dir, File},
     io::Read,
     path::PathBuf,
 };
+
+use super::compile::builtin::prelude::path_to_string;
 
 enum Error {
     CouldNotAddModule,
@@ -24,23 +27,23 @@ impl Error {
     fn core(&self) -> CoreError {
         match self {
             Self::CouldNotAddModule => CoreError::make_raw(
-                "could not add module", //
-                "",                     //
+                "could not add module",
+                "",
             ),
             Self::CouldNotFind(path) => CoreError::make_raw(
-                format!("could not find import at {:?}", path), //
-                "",                                             //
+                format!("could not find import at {}", path),
+                "",
             ),
             Self::PathOutsideRoot(path, level) => CoreError::make_raw(
-                "relative import would go outside of source code root", //
+                "relative import would go outside of source code root",
                 format!(
-                    "Hint: you can't go up {} directory levels from {:?}.",
+                    "Hint: you can't go up {} directory levels from {}.",
                     level, path
-                ), //
+                ),
             ),
             Self::Os => CoreError::make_raw(
-                "OS error", //
-                "",         //
+                "OS error",
+                "",
             ),
         }
     }
@@ -182,9 +185,11 @@ impl ComboPath {
 
         return fs_path.is_dir() && init_fs_path.is_file();
     }
+}
 
-    fn is_builtin(&self) -> bool {
-        return self.base == "dot" && self.path.len() >= 1 && self.path.get(0).unwrap() == "seahorse"
+impl Display for ComboPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} + {}", self.fs_base.display(), path_to_string(&self.path))
     }
 }
 
@@ -215,25 +220,34 @@ impl ModuleTreeBuilder {
                     match obj {
                         ca::TopLevelStatementObj::Import { symbols } => {
                             for ca::ImportSymbol { symbol, .. } in symbols.iter() {
-                                let mut path = path.clone();
-                                path.pop();
-                                path.push(symbol.clone());
+                                // Try a Seahorse import
+                                {
+                                    let mut path = ComboPath::new(vec!["sh".to_string()], PathBuf::new());
+                                    path.push(symbol.clone());
 
-                                if path.is_builtin() {
-                                    continue;
+                                    if self.tree.get(&path.get_path()).is_some() {
+                                        continue;
+                                    }
                                 }
 
-                                if path.is_module() {
-                                    let module = load_module(path.get_fs_module_path())?;
-                                    self.add_module(module, path)?;
-                                } else if path.is_package() {
-                                    self.add_package(path)?;
-                                }
-                                // TODO check for ext. modules
-                                else {
-                                    return Err(Error::CouldNotFind(path)
-                                        .core()
-                                        .located(loc.clone()));
+                                // Try a local import
+                                {
+                                    let mut path = path.clone();
+                                    path.pop();
+                                    path.push(symbol.clone());
+    
+                                    if path.is_module() {
+                                        let module = load_module(path.get_fs_module_path())?;
+                                        self.add_module(module, path)?;
+                                    } else if path.is_package() {
+                                        self.add_package(path)?;
+                                    }
+                                    // TODO check for ext. modules
+                                    else {
+                                        return Err(Error::CouldNotFind(path)
+                                            .core()
+                                            .located(loc.clone()));
+                                    }
                                 }
                             }
                         }
@@ -248,36 +262,47 @@ impl ModuleTreeBuilder {
                                     .located(loc.clone()));
                             }
 
-                            let mut path = path.clone();
-                            // Pop the module name
-                            path.pop();
-                            for _ in 0..*level {
-                                path.pop();
-                            }
-
-                            'outer: loop {
-                                for part in symbol_path.iter() {
-                                    path.push(part.clone());
-
-                                    if path.is_builtin() {
-                                        break 'outer;
-                                    }
-
-                                    if path.is_module() {
-                                        let module = load_module(path.get_fs_module_path())?;
-                                        self.add_module(module, path)?;
-                                        break 'outer;
+                            // (Loop used so that nested scopes can immediately break here.)
+                            'done: loop {
+                                // Try a Seahorse import
+                                if *level == 0 {
+                                    let mut path = ComboPath::new(vec!["sh".to_string()], PathBuf::new());
+                                    for part in symbol_path.iter() {
+                                        path.push(part.clone());
+                                        
+                                        if self.tree.get(&path.get_path()).is_some() {
+                                            break 'done;
+                                        }
                                     }
                                 }
 
-                                if path.is_package() {
-                                    self.add_package(path)?;
-                                } else {
-                                    return Err(Error::CouldNotFind(path)
-                                        .core()
-                                        .located(loc.clone()));
+                                // Try a local import
+                                {
+                                    let mut path = path.clone();
+                                    // Pop the module name
+                                    path.pop();
+                                    for _ in 0..*level {
+                                        path.pop();
+                                    }
+        
+                                    for part in symbol_path.iter() {
+                                        path.push(part.clone());
+    
+                                        if path.is_module() {
+                                            let module = load_module(path.get_fs_module_path())?;
+                                            self.add_module(module, path)?;
+                                            break 'done;
+                                        }
+                                    }
+    
+                                    if path.is_package() {
+                                        self.add_package(path)?;
+                                    } else {
+                                        return Err(Error::CouldNotFind(path)
+                                            .core()
+                                            .located(loc.clone()));
+                                    }
                                 }
-
                                 break;
                             }
                         }
@@ -328,21 +353,29 @@ impl ModuleTreeBuilder {
 
 /// Preprocess the source module by loading its dependencies and packaging them into a registry.
 pub fn preprocess(module: ca::Module, working_dir: PathBuf) -> Result<ModuleRegistry, CoreError> {
-    // TODO just assuming this structure for now:
-    // programs_py (dot)
+    // The file system should have this structure:
+    // programs_py
     // |\_ seahorse
     // |   |\_ prelude.py
-    // |\_ program_name.py (program)
+    // |\_ program_name.py
     //
-    // In the future there will be other sources for modules (besides `dot`) - will need to make
-    // sure that these are ordered in some way
+    // Which will be turned into this:
+    // (root)
+    // |\_ sh
+    // |   |\_ seahorse
+    // |       |\_ prelude
+    // |\_ dot
+    //     |\_ program
+    //
+    // sh and dot are the two registry sources. sh represents Seahorse builtins, and dot represents
+    // local files.
     let mut builder = ModuleTreeBuilder::new();
 
     builder.add_module(
         Module::SeahorsePrelude,
         ComboPath::new(
             vec![
-                "dot".to_string(),
+                "sh".to_string(),
                 "seahorse".to_string(),
                 "prelude".to_string(),
             ],
@@ -358,7 +391,7 @@ pub fn preprocess(module: ca::Module, working_dir: PathBuf) -> Result<ModuleRegi
     let registry = ModuleRegistry {
         tree: builder.tree,
         origin: vec!["dot".to_string(), "program".to_string()],
-        order: vec!["dot".to_string()],
+        order: vec!["sh".to_string(), "dot".to_string()],
     };
 
     return Ok(registry);

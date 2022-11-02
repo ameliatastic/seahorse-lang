@@ -1148,10 +1148,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
-                artifact.uses[0].tree.remove(&vec![
-                    "dot".to_string(),
-                    "seahorse".to_string()
-                ]);
+                artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);
             })
