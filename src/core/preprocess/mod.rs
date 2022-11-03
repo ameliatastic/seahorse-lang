@@ -359,7 +359,7 @@ impl ModuleTreeBuilder {
                 let mut path = path.clone();
                 path.push(name);
 
-                if path.is_module() {
+                if path.is_package() {
                     self.add_package(path)?;
                 }
             }

@@ -1156,8 +1156,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
             })
             .transpose()?;
 
-        if let Some(Tree::Node(node)) = tree.get_mut(&vec!["dot".to_string()]) {
-            node.remove("seahorse");
+        if let Tree::Node(node) = &mut tree {
+            node.remove("sh");
         }
 
         return Ok(BuildOutput {
