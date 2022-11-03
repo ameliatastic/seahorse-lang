@@ -204,7 +204,10 @@ impl Ty {
                 Python::Bool | Python::Int | Python::None | Python::Str | Python::Tuple => false,
                 _ => true,
             },
-            Ty::Generic(TyName::Defined(_, DefinedType::Struct | DefinedType::Account | DefinedType::Event), _) => true,
+            Ty::Generic(
+                TyName::Defined(_, DefinedType::Struct | DefinedType::Account | DefinedType::Event),
+                _,
+            ) => true,
             Ty::Generic(TyName::Defined(_, DefinedType::Enum), _) => false,
             _ => false,
         }
@@ -1420,9 +1423,7 @@ impl<'a> Context<'a> {
                                     loc,
                                 )?,
                                 Some(Signature::Class(ClassSignature::Struct(
-                                    sig @ StructSignature {
-                                        is_event: true, ..
-                                    },
+                                    sig @ StructSignature { is_event: true, .. },
                                 ))) => self.unify(
                                     expr_ty,
                                     Ty::Type(
@@ -1493,9 +1494,7 @@ impl<'a> Context<'a> {
                                 loc,
                             )?,
                             Some(Signature::Class(ClassSignature::Struct(
-                                sig @ StructSignature {
-                                    is_event: true, ..
-                                },
+                                sig @ StructSignature { is_event: true, .. },
                             ))) => self.unify(
                                 expr_ty,
                                 Ty::Type(

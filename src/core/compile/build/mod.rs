@@ -209,7 +209,10 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                         params,
                     },
                 },
-                TyName::Defined(_, DefinedType::Struct | DefinedType::Enum | DefinedType::Event) => TyExpr::Generic {
+                TyName::Defined(
+                    _,
+                    DefinedType::Struct | DefinedType::Enum | DefinedType::Event,
+                ) => TyExpr::Generic {
                     mutability,
                     name: base,
                     params,

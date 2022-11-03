@@ -289,7 +289,7 @@ fn build_signature(
                     }
                     Ty::Generic(
                         TyName::Builtin(bi::Builtin::Prelude(bi::prelude::Prelude::Event)),
-                        _
+                        _,
                     ) => {
                         is_event = true;
                     }

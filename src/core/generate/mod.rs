@@ -212,12 +212,16 @@ impl ToTokens for Struct {
             None
         };
 
-        let macros = if *is_event { quote! {
-            #[event]
-            #[derive(Clone, Debug, Default)]
-        }} else { quote! {
-            #[derive(Clone, Debug, Default)]
-        }};
+        let macros = if *is_event {
+            quote! {
+                #[event]
+                #[derive(Clone, Debug, Default)]
+            }
+        } else {
+            quote! {
+                #[derive(Clone, Debug, Default)]
+            }
+        };
 
         let fields = fields.iter().map(|(name, ty)| {
             let name = ident(name);
