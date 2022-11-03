@@ -217,11 +217,12 @@ impl ModuleTreeBuilder {
         match module {
             Module::Python(module) => {
                 // Insert something as a placeholder, to detect overwriting during recursive calls
+                // (This also performs the check to see if the module is already added)
                 if !self
                     .tree
                     .insert(path.get_path(), Tree::Leaf(Module::SeahorsePrelude), false)
                 {
-                    return Err(Error::CouldNotAddModule.core());
+                    return Ok(());
                 }
 
                 for Located(loc, obj) in module.statements.iter() {
