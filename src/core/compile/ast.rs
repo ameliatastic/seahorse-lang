@@ -47,6 +47,7 @@ pub struct Struct {
     pub fields: Vec<(String, TyExpr)>,
     pub methods: Vec<(MethodType, Function)>,
     pub constructor: Option<Function>,
+    pub is_event: bool,
 }
 
 /// An Anchor account definition.

@@ -15,6 +15,7 @@ pub enum Prelude {
     Array,
     Enum,
     Account,
+    Event,
     Signer,
     Empty,
     Program,
@@ -46,6 +47,7 @@ pub fn namespace() -> Namespace {
     let data = [
         ("Array", Prelude::Array),
         ("Enum", Prelude::Enum),
+        ("Event", Prelude::Event),
         ("Account", Prelude::Account),
         ("Signer", Prelude::Signer),
         ("Empty", Prelude::Empty),
@@ -93,6 +95,7 @@ impl BuiltinSource for Prelude {
             Self::Array => "Array",
             Self::Enum => "Enum",
             Self::Account => "Account",
+            Self::Event => "Event",
             Self::Signer => "Signer",
             Self::Empty => "Empty",
             Self::Program => "Program",
@@ -1226,6 +1229,23 @@ impl BuiltinSource for Prelude {
                             let obj = expr.obj.without_borrows();
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 #obj.key().as_ref()
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                )),
+                _ => None,
+            },
+            Self::Pubkey => match builtin {
+                Builtin::Prelude(Self::Seed) => Some((
+                    Ty::prelude(self.clone(), vec![]).into(),
+                    Ty::Transformed(
+                        ty.clone().into(),
+                        Transformation::new(|mut expr| {
+                            let obj = expr.obj.without_borrows();
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #obj.as_ref()
                             });
 
                             Ok(Transformed::Expression(expr))

@@ -88,6 +88,7 @@ pub enum ClassSignature {
 #[derive(Clone, Debug)]
 pub struct StructSignature {
     pub is_account: bool,
+    pub is_event: bool,
     pub bases: Vec<Ty>,
     pub fields: HashMap<String, Ty>,
     pub methods: HashMap<String, (MethodType, FunctionSignature)>,
@@ -154,6 +155,10 @@ impl Tree<Signed> {
                                 is_account: true,
                                 ..
                             })) => DefinedType::Account,
+                            Signature::Class(ClassSignature::Struct(StructSignature {
+                                is_event: true,
+                                ..
+                            })) => DefinedType::Event,
                             Signature::Class(ClassSignature::Enum(..)) => DefinedType::Enum,
                             _ => DefinedType::Struct,
                         };
@@ -212,11 +217,13 @@ impl TryFrom<NamespaceOutput> for SignOutput {
                     match signature {
                         Signature::Class(ClassSignature::Struct(StructSignature {
                             is_account,
+                            is_event,
                             bases,
                             fields,
                             methods,
                         })) => Signature::Class(ClassSignature::Struct(StructSignature {
                             is_account,
+                            is_event,
                             bases,
                             fields: fields
                                 .into_iter()
@@ -262,6 +269,7 @@ fn build_signature(
         ca::TopLevelStatementObj::ClassDef { body, bases, .. } => {
             let mut is_account = false;
             let mut is_enum = false;
+            let mut is_event = false;
             let mut bases_ = vec![];
             for base in bases.iter() {
                 let base = root.build_ty(base, abs)?;
@@ -278,6 +286,12 @@ fn build_signature(
                         _,
                     ) => {
                         is_enum = true;
+                    }
+                    Ty::Generic(
+                        TyName::Builtin(bi::Builtin::Prelude(bi::prelude::Prelude::Event)),
+                        _
+                    ) => {
+                        is_event = true;
                     }
                     ty => {
                         return Err(Error::InvalidBase(ty).core(&loc));
@@ -368,6 +382,7 @@ fn build_signature(
 
                 Ok(Signature::Class(ClassSignature::Struct(StructSignature {
                     is_account,
+                    is_event,
                     fields,
                     bases: bases_,
                     methods,
