@@ -355,7 +355,12 @@ impl<'a> Context<'a> {
 
         let returns = make_ty_expr(
             def_returns.unwrap_or(Located(
-                Location::default(),
+                // Location doesn't matter here I think
+                // (if it does then whoopsies)
+                Location::new(
+                    &Rc::new("".to_string()),
+                    rustpython_parser::location::Location::default(),
+                ),
                 ast::TyExpressionObj::Generic {
                     base: vec!["None".to_string()],
                     params: vec![],
@@ -591,7 +596,7 @@ impl<'a> Context<'a> {
                     _ => panic!(),
                 };
 
-                let order = order_args(&args, params, &expression.0)?;
+                let order = order_args(&args, params, &loc)?;
                 let mut args = vec![];
                 for arg in order.into_iter() {
                     match arg {
@@ -1144,17 +1149,15 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
-                artifact.uses[0].tree.remove(&vec![
-                    "dot".to_string(),
-                    "seahorse".to_string()
-                ]);
+                // Prune all Seahorse builtins
+                artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);
             })
             .transpose()?;
 
-        if let Some(Tree::Node(node)) = tree.get_mut(&vec!["dot".to_string()]) {
-            node.remove("seahorse");
+        if let Tree::Node(node) = &mut tree {
+            node.remove("sh");
         }
 
         return Ok(BuildOutput {

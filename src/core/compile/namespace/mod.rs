@@ -39,7 +39,7 @@ impl Error {
     }
 }
 
-fn path_to_string(path: &Vec<String>) -> String {
+pub fn path_to_string(path: &Vec<String>) -> String {
     if path.len() == 0 {
         return "".to_string();
     }

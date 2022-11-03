@@ -60,6 +60,10 @@ fn _flatten(tree: &GenerateOutput, path: &mut Vec<String>) -> String {
 
 pub fn compile(args: CompileArgs) -> Result<(), Box<dyn Error>> {
     let input_file = args.input_file.map(|path| Path::new(&path).to_path_buf());
+    let working_dir = input_file.clone().map(|mut path| {
+        path.pop();
+        path
+    });
     let output_file = args.output_file.map(|path| Path::new(&path).to_path_buf());
 
     let program_name = match (&input_file, &output_file) {
@@ -99,7 +103,7 @@ pub fn compile(args: CompileArgs) -> Result<(), Box<dyn Error>> {
     let mut py_src = String::new();
     input.read_to_string(&mut py_src)?;
 
-    let rs_src = seahorse_compile(py_src, program_name)?;
+    let rs_src = seahorse_compile(py_src, program_name, working_dir)?;
 
     output.write_all(flatten(&rs_src).as_bytes())?;
 

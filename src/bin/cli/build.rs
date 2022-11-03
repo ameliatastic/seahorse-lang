@@ -6,7 +6,7 @@ use clap::Args;
 use owo_colors::OwoColorize;
 use std::{
     error::Error,
-    fs::{DirBuilder, File},
+    fs::{remove_dir_all, DirBuilder, File},
     io::{Read, Write},
     path::PathBuf,
     process::Command,
@@ -69,13 +69,18 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
             let mut input = File::open(input_path)?;
             input.read_to_string(&mut py_src)?;
 
-            let tree = compile(py_src, program_name.clone())?;
+            let tree = compile(
+                py_src,
+                program_name.clone(),
+                Some(project_path.join(SRC_PATH)),
+            )?;
 
             let src = project_path
                 .join("programs")
                 .join(program_name.clone())
                 .join("src");
 
+            remove_dir_all(&src)?;
             write_src_tree(&tree, src)?;
 
             let anchor_output = Command::new("anchor")

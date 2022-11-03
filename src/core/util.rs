@@ -1,5 +1,5 @@
 use owo_colors::OwoColorize;
-pub use rustpython_parser::ast::Location;
+use rustpython_parser::ast::Location as SrcLocation;
 use std::{collections::HashMap, error, fmt, rc::Rc};
 
 /// Match and extract against a single pattern, panicking if no match.
@@ -14,26 +14,40 @@ macro_rules! match1 {
 }
 
 #[derive(Debug, Clone)]
-pub enum CoreError {
-    Raw {
-        message: (String, String),
-        location: Option<Location>,
-    },
-    WithContext {
-        message: (String, String),
-        location: Option<Location>,
-        context: Option<String>,
-    },
+pub struct CoreError {
+    message: (String, String),
+    src: Option<Rc<String>>,
+    loc: Option<SrcLocation>,
 }
 
 impl CoreError {
-    pub fn located(self, location: Location) -> Self {
-        match self {
-            Self::Raw { message, .. } => Self::Raw {
-                message,
-                location: Some(location),
-            },
-            _ => panic!(),
+    pub fn located(self, loc: Location) -> Self {
+        Self {
+            loc: Some(loc.loc),
+            src: Some(loc.src),
+            ..self
+        }
+    }
+
+    pub fn updated(self, loc: &Location) -> Self {
+        Self {
+            loc: Some(self.loc.unwrap_or_else(|| loc.loc.clone())),
+            src: Some(self.src.unwrap_or_else(|| loc.src.clone())),
+            ..self
+        }
+    }
+
+    pub fn with_loc(self, loc: SrcLocation) -> Self {
+        Self {
+            loc: Some(loc),
+            ..self
+        }
+    }
+
+    pub fn with_src(self, src: Rc<String>) -> Self {
+        Self {
+            src: Some(src),
+            ..self
         }
     }
 
@@ -42,34 +56,10 @@ impl CoreError {
         H: ToString,
         F: ToString,
     {
-        Self::Raw {
+        Self {
             message: (header.to_string(), footer.to_string()),
-            location: None,
-        }
-    }
-
-    pub fn with_context(self, source: &String) -> Self {
-        match self {
-            Self::Raw {
-                message,
-                location: Some(location),
-            } => {
-                let context = source
-                    .lines()
-                    .nth(location.row() - 1)
-                    .map(|s| s.to_string());
-                Self::WithContext {
-                    message,
-                    context,
-                    location: Some(location),
-                }
-            }
-            Self::Raw { message, .. } => Self::WithContext {
-                message,
-                location: None,
-                context: None,
-            },
-            with_context => with_context,
+            src: None,
+            loc: None,
         }
     }
 }
@@ -77,19 +67,14 @@ impl CoreError {
 impl fmt::Display for CoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::WithContext {
+            Self {
                 message: (header, footer),
-                location: None,
-                context: None,
+                src: Some(src),
+                loc: Some(loc),
             } => {
-                write!(f, "Error: {}.\n{}", header, footer)
-            }
-            Self::WithContext {
-                message: (header, footer),
-                location: Some(location),
-                context: Some(context),
-            } => {
-                let line = format!("{} |", location.row());
+                let line = format!("{} |", loc.row());
+                let context = src.lines().nth(loc.row() - 1).map(|s| s.to_string());
+
                 if footer.len() > 0 {
                     write!(
                         f,
@@ -97,10 +82,10 @@ impl fmt::Display for CoreError {
                         "Error".red().bold(),
                         header.bold(),
                         line,
-                        context,
+                        context.unwrap(),
                         "^".bold(),
                         footer,
-                        col = line.len() + 1 + location.column()
+                        col = line.len() + 1 + loc.column()
                     )
                 } else {
                     write!(
@@ -109,17 +94,17 @@ impl fmt::Display for CoreError {
                         "Error".red().bold(),
                         header.bold(),
                         line,
-                        context,
+                        context.unwrap(),
                         "^".bold(),
-                        col = line.len() + 1 + location.column()
+                        col = line.len() + 1 + loc.column()
                     )
                 }
             }
-            s => {
-                panic!(
-                    "Attempted to display an unformattable error message ({:?})",
-                    s
-                )
+            Self {
+                message: (header, footer),
+                ..
+            } => {
+                write!(f, "Error: {}.\n{}", header, footer)
             }
         }
     }
@@ -141,6 +126,21 @@ where
     U: Sized,
 {
     fn try_pass(&mut self, t: T) -> CResult<U>;
+}
+
+#[derive(Debug, Clone)]
+pub struct Location {
+    pub src: Rc<String>,
+    pub loc: SrcLocation,
+}
+
+impl Location {
+    pub fn new(src: &Rc<String>, loc: SrcLocation) -> Self {
+        Self {
+            src: src.clone(),
+            loc,
+        }
+    }
 }
 
 /// Generic type to encapsulate syntax elements with a source code location.
@@ -273,6 +273,51 @@ impl<T> Tree<T> {
         }
 
         return Some(tree);
+    }
+
+    /// Insert a subtree into the tree at the given path.
+    ///
+    /// Returns whether the operation completed successfully - will fail if the insertion would have
+    /// to override a preexisting part of the tree.
+    pub fn insert(&mut self, mut path: Vec<String>, tree: Tree<T>, allow_overwrite: bool) -> bool {
+        let last = match path.pop() {
+            Some(last) => last,
+            _ => {
+                return false;
+            }
+        };
+
+        return self._insert(path.into_iter(), last, tree, allow_overwrite);
+    }
+
+    fn _insert<I: Iterator<Item = String>>(
+        &mut self,
+        mut path: I,
+        last: String,
+        tree: Self,
+        allow_overwrite: bool,
+    ) -> bool {
+        match self {
+            Self::Node(node) => match path.next() {
+                Some(part) => {
+                    if !node.contains_key(&part) {
+                        node.insert(part.clone(), Tree::Node(HashMap::new()));
+                    }
+                    let next = node.get_mut(&part).unwrap();
+
+                    next._insert(path, last, tree, allow_overwrite)
+                }
+                None => {
+                    if !allow_overwrite && node.contains_key(&last) {
+                        return false;
+                    }
+
+                    node.insert(last, tree);
+                    true
+                }
+            },
+            _ => false,
+        }
     }
 
     /// Return whether the tree contains a leaf at the given `path`.
