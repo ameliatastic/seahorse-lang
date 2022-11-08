@@ -197,7 +197,8 @@ impl Ty {
                 | Prelude::Signer
                 | Prelude::Empty
                 | Prelude::TokenMint
-                | Prelude::TokenAccount => false,
+                | Prelude::TokenAccount
+                | Prelude::Clock => false,
                 _ => true,
             },
             Ty::Generic(TyName::Builtin(Builtin::Python(builtin)), _) => match builtin {

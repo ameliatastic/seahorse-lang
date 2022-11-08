@@ -317,11 +317,13 @@ impl<'a> Context<'a> {
                         .zip(def_params.params.iter())
                         .filter_map(|((name, ty, _), Located(_, ParamObj { annotation, .. }))| {
                             if ty.is_account() {
+                                let mut account_annotation = AccountAnnotation::new();
+                                account_annotation.is_mut = ty.is_mut();
                                 Some((
                                     name.clone(),
                                     ContextAccount {
                                         account_ty: make_account_ty_expr(ty.clone()),
-                                        annotation: Some(AccountAnnotation::new()),
+                                        annotation: Some(account_annotation),
                                         ty: Some(make_ty_expr(annotation.clone(), ty.clone())),
                                     },
                                 ))
