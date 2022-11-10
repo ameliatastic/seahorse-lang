@@ -1234,6 +1234,8 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
         pub mod seahorse_util {
             use super::*;
             use std::{collections::HashMap, fmt::Debug, ops::Deref};
+            // Re-export for ease of access
+            pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
 
             // A "Python mutable" object.
             pub struct Mutable<T>(Rc<RefCell<T>>);

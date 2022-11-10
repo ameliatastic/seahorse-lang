@@ -185,8 +185,8 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                             TyExpr::new_specific(vec!["TokenAccount"], Mutability::Immutable),
                         ],
                     },
-                    // Program, UncheckedAccount -> UncheckedAccount<'info>
-                    Builtin::Prelude(Prelude::Program | Prelude::UncheckedAccount) => {
+                    // Program, UncheckedAccount, pyth.PriceAccount -> UncheckedAccount<'info>
+                    Builtin::Prelude(Prelude::Program | Prelude::UncheckedAccount) | Builtin::Pyth(Pyth::PriceAccount) => {
                         TyExpr::Generic {
                             mutability: Mutability::Immutable,
                             name: vec!["UncheckedAccount".to_string()],
@@ -240,6 +240,7 @@ fn make_account_ty_expr(ty: Ty) -> AccountTyExpr {
                 Prelude::Clock => AccountTyExpr::ClockSysvar,
                 _ => panic!(),
             },
+            TyName::Builtin(Builtin::Pyth(Pyth::PriceAccount)) => AccountTyExpr::UncheckedAccount,
             TyName::Defined(name, DefinedType::Account) => AccountTyExpr::Defined(name),
             _ => panic!(),
         },

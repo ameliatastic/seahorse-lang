@@ -2,11 +2,11 @@ use crate::core::{compile::check::*, util::*};
 pub use std::collections::HashMap;
 
 pub mod prelude;
+pub mod pyth;
 pub mod python;
 pub use prelude::Prelude;
+pub use pyth::Pyth;
 pub use python::Python;
-
-use self::prelude::Transformation;
 
 /// A trait to help keep the API consistent.
 ///
@@ -40,8 +40,9 @@ pub trait BuiltinSource: std::fmt::Debug + Clone + PartialEq {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Builtin {
-    Python(python::Python),
-    Prelude(prelude::Prelude),
+    Python(Python),
+    Prelude(Prelude),
+    Pyth(Pyth),
 }
 
 impl From<python::Python> for Builtin {
@@ -55,6 +56,7 @@ macro_rules! match_builtin {
         match $self {
             Self::Python($builtin) => $func,
             Self::Prelude($builtin) => $func,
+            Self::Pyth($builtin) => $func,
         }
     };
 }
