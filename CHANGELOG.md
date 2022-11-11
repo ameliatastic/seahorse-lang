@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- System clock is now immutable in instruction contexts (a.k.a. it works now)
+
 ## [0.2.3]
 
 ### Added
