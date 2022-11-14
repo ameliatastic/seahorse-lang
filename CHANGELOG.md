@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Pubkey.find_program_address()` function, to find a PDA given a list of seeds and the program key
+- Decorator @dataclass for classes to automatically generate a default constructor
+
 
 ### Fixed
 
@@ -21,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Pyth integration
-
 ### Fixed
 
 - System clock is now immutable in instruction contexts (a.k.a. it works now)
