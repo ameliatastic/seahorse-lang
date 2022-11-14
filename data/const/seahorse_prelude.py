@@ -849,6 +849,9 @@ def declare_id(id: str):
 def instruction(function: Callable[..., None]) -> Callable[..., None]:
     """Decorator to turn a function into a program instruction."""
 
+def dataclass(function: Callable[..., None]) -> Callable[..., None]:
+    """Decorator to create an automatic default class constructor."""
+
 def int_bytes(n: Any, be: bool = False) -> List[u8]:
     """
     Convenience method to turn an integer type into a little-endian (by default) list of bytes.

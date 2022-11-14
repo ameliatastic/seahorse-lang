@@ -29,6 +29,7 @@ pub enum TopLevelStatementObj {
         name: String,
         body: Vec<ClassDefStatement>,
         bases: Vec<TyExpression>,
+        decorator_list: Vec<Expression>,
     },
     FunctionDef(FunctionDef),
     Expression(Expression),
