@@ -1273,7 +1273,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             // Pythonic indexing for vec/array types (Seahorse List, Array types)
             impl<T: Clone> Mutable<Vec<T>> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index > 0 {
+                    if index >= 0 {
                         return index.try_into().unwrap();
                     }
 
@@ -1284,7 +1284,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
 
             impl<T: Clone, const N: usize> Mutable<[T; N]> {
                 pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index > 0 {
+                    if index >= 0 {
                         return index.try_into().unwrap();
                     }
 
