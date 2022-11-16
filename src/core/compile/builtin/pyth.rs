@@ -215,8 +215,35 @@ impl BuiltinSource for Pyth {
         None
     }
 
-    fn casted(&self, _ty: &Ty) -> Option<(Ty, Ty)> {
-        // TODO cast Price as account/seed
-        None
+    fn casted(&self, ty: &Ty) -> Option<(Ty, Ty)> {
+        let builtin = if let Ty::Generic(TyName::Builtin(builtin), _) = ty {
+            builtin
+        } else {
+            return None;
+        };
+
+        match self {
+            Self::PriceAccount => match builtin {
+                Builtin::Prelude(Prelude::Account | Prelude::InitAccount) => {
+                    Some((Ty::pyth(self.clone(), vec![]), ty.clone()))
+                }
+                Builtin::Prelude(Prelude::Seed) => Some((
+                    Ty::pyth(self.clone(), vec![]).into(),
+                    Ty::Transformed(
+                        ty.clone().into(),
+                        Transformation::new(|mut expr| {
+                            let obj = expr.obj.without_borrows();
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #obj.key().as_ref()
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                )),
+                _ => None,
+            },
+            _ => None
+        }
     }
 }
