@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - System clock is now immutable in instruction contexts (a.k.a. it works now)
+- Fix accessing index 0 of arrays
 
 ## [0.2.3]
 

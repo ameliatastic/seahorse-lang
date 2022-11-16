@@ -194,7 +194,6 @@ impl Ty {
                 Prelude::RustFloat
                 | Prelude::RustInt(..)
                 | Prelude::Pubkey
-                | Prelude::Signer
                 | Prelude::Empty
                 | Prelude::TokenMint
                 | Prelude::TokenAccount
