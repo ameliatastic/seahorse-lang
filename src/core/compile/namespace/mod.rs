@@ -1,7 +1,11 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
 use crate::core::{
-    clean::ast as ca, compile::builtin::*, compile::check::*, preprocess::{self as pre, Module}, util::*,
+    clean::ast as ca,
+    compile::builtin::*,
+    compile::check::*,
+    preprocess::{self as pre, Module},
+    util::*,
 };
 use std::collections::{HashMap, VecDeque};
 
@@ -186,7 +190,7 @@ impl TryFrom<pre::ModuleRegistry> for NamespaceOutput {
         let mut wip = registry.tree.clone().map(|module| match module {
             Module::Python(..) => Wip::Empty,
             Module::SeahorsePrelude => Wip::Done(prelude::namespace()),
-            Module::SeahorsePyth => Wip::Done(pyth::namespace())
+            Module::SeahorsePyth => Wip::Done(pyth::namespace()),
         });
 
         build_namespace(&mut wip, &registry, &registry.origin)?;
@@ -294,7 +298,7 @@ fn build_namespace(
             let module = match1!(registry.tree.get(path).unwrap(), Tree::Leaf(module) => module);
             let namespace = match module {
                 pre::Module::Python(module) => build_python_namespace(wip, registry, path, module)?,
-                _ => panic!()
+                _ => panic!(),
             };
 
             *wip.get_mut(path).unwrap() = Tree::Leaf(Wip::Done(namespace));

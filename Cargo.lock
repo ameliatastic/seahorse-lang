@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "seahorse-lang"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "base58",
  "clap",

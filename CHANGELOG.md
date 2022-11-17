@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4]
+
+### Added
+
+- Pyth integration
+
 ### Fixed
 
 - System clock is now immutable in instruction contexts (a.k.a. it works now)

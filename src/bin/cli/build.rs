@@ -104,9 +104,7 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
             if !anchor_output.status.success()
                 || stderr.contains("error") | stderr.contains("panicked")
             {
-                return Err(
-                    error_message(format!("{} failed:\n{}", cmd, stderr)).into(),
-                );
+                return Err(error_message(format!("{} failed:\n{}", cmd, stderr)).into());
             }
 
             return Ok(anchor_output.stdout);
