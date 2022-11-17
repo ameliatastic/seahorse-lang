@@ -7,8 +7,8 @@ pub use crate::core::{
     compile::{ast::*, build::*, check::*, namespace::*, sign::*},
     util::*,
 };
-use crate::match1;
 use crate::data::get_pyth_price_address;
+use crate::match1;
 use base58::FromBase58;
 use quote::quote;
 use regex::Regex;
@@ -18,7 +18,7 @@ pub enum Pyth {
     // Types
     PriceAccount,
     PriceFeed,
-    Price
+    Price,
 }
 
 /// Create the seahorse.pyth namespace.
@@ -26,7 +26,7 @@ pub fn namespace() -> Namespace {
     let data = [
         ("PriceAccount", Pyth::PriceAccount),
         ("PriceFeed", Pyth::PriceFeed),
-        ("Price", Pyth::Price)
+        ("Price", Pyth::Price),
     ];
 
     let mut namespace = HashMap::new();
@@ -45,7 +45,7 @@ impl BuiltinSource for Pyth {
         match self {
             Self::PriceAccount => "PriceAccount",
             Self::PriceFeed => "PriceFeed",
-            Self::Price => "Price"
+            Self::Price => "Price",
         }
         .to_string()
     }
@@ -128,7 +128,10 @@ impl BuiltinSource for Pyth {
                                 .from_base58()
                                 .unwrap();
 
-                            let msg = format!("Pyth PriceAccount validation failed: expected {}", product);
+                            let msg = format!(
+                                "Pyth PriceAccount validation failed: expected {}",
+                                product
+                            );
 
                             expr.obj = ExpressionObj::Rendered(quote! {
                                 {
@@ -160,24 +163,24 @@ impl BuiltinSource for Pyth {
                             });
 
                             Ok(Transformed::Expression(expr))
-                        })
-                    )
-                )
+                        }),
+                    ),
+                ),
             )),
             // Price.price: i64
             (Self::Price, "price") => Some((
                 ty_no_params,
-                Ty::prelude(Prelude::RustInt(true, 64), vec![])
+                Ty::prelude(Prelude::RustInt(true, 64), vec![]),
             )),
             // Price.conf: u64
             (Self::Price, "conf") => Some((
                 ty_no_params,
-                Ty::prelude(Prelude::RustInt(false, 64), vec![])
+                Ty::prelude(Prelude::RustInt(false, 64), vec![]),
             )),
             // Price.expo: i32
             (Self::Price, "expo") => Some((
                 ty_no_params,
-                Ty::prelude(Prelude::RustInt(true, 32), vec![])
+                Ty::prelude(Prelude::RustInt(true, 32), vec![]),
             )),
             // Price.num() -> f64
             (Self::Price, "num") => Some((
@@ -199,9 +202,9 @@ impl BuiltinSource for Pyth {
                             });
 
                             Ok(Transformed::Expression(expr))
-                        })
-                    )
-                )
+                        }),
+                    ),
+                ),
             )),
             _ => None,
         }
@@ -243,7 +246,7 @@ impl BuiltinSource for Pyth {
                 )),
                 _ => None,
             },
-            _ => None
+            _ => None,
         }
     }
 }

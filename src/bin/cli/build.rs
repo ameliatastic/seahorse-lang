@@ -81,11 +81,18 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 .join("src");
 
             remove_dir_all(&src)?;
-            write_src_tree(&tree, src)?;
+            write_src_tree(&tree.tree, src)?;
 
-            let anchor_output = Command::new("anchor")
-                .args(["build", "-p", program_name.as_str()])
-                .output()?;
+            let mut args = vec!["build", "-p", program_name.as_str()];
+            if tree.features.len() > 0 {
+                args.push("--");
+                args.push("--features");
+                for feature in tree.features.iter() {
+                    args.push(feature.name());
+                }
+            }
+
+            let anchor_output = Command::new("anchor").args(args).output()?;
             let stderr = String::from_utf8(anchor_output.stderr)?;
 
             if !anchor_output.status.success()

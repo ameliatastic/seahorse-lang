@@ -7,10 +7,28 @@ use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
 #[cfg(not(target_arch = "wasm32"))]
 use rustfmt_wrapper::{config::*, rustfmt_config, Error as RustfmtError};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use super::compile::builtin::prelude::MethodType;
 
-pub type GenerateOutput = Tree<String>;
+pub struct GenerateOutput {
+    pub tree: Tree<String>,
+    pub features: HashSet<Feature>,
+}
+
+/// A set of features that need to be turned on in order to compile an artifact.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Feature {
+    Pyth,
+}
+
+impl Feature {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Pyth => "pyth-sdk-solana",
+        }
+    }
+}
 
 /// Convenience function for turning strings into Idents
 fn ident<S: ToString>(name: &S) -> Ident {
@@ -1235,6 +1253,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             use super::*;
             use std::{collections::HashMap, fmt::Debug, ops::Deref};
             // Re-export for ease of access
+            #[cfg(feature = "pyth-sdk-solana")]
             pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
 
             // A "Python mutable" object.
@@ -1499,9 +1518,17 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
         let origin = build_output.tree.get_leaf(&build_output.origin).unwrap();
         let lib = make_lib(origin, &build_output.origin, &program_name)?;
 
+        let features = Rc::new(RefCell::new(HashSet::new()));
+
         let mut tree = build_output
             .tree
-            .map(|artifact| beautify(quote! { #artifact }))
+            .map(|artifact| {
+                let text = beautify(quote! { #artifact })?;
+
+                features.borrow_mut().extend(artifact.features.into_iter());
+
+                Ok(text)
+            })
             .transpose()?;
 
         add_mods(&mut tree);
@@ -1524,7 +1551,10 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
             );
         }
 
-        return Ok(tree);
+        return Ok(GenerateOutput {
+            tree,
+            features: features.take(),
+        });
     }
 }
 

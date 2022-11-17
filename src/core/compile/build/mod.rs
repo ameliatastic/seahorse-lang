@@ -4,13 +4,17 @@ use crate::{
     core::{
         clean::ast::{self, ComprehensionPart, Expression, ParamObj},
         compile::{ast::*, builtin::*, check::*},
+        generate::Feature,
         util::*,
     },
     match1,
 };
 use heck::ToPascalCase;
 use quote::quote;
-use std::{collections::VecDeque, rc::Rc};
+use std::{
+    collections::{HashSet, VecDeque},
+    rc::Rc,
+};
 
 use super::{check::*, namespace::*, sign::*};
 
@@ -186,13 +190,12 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                         ],
                     },
                     // Program, UncheckedAccount, pyth.PriceAccount -> UncheckedAccount<'info>
-                    Builtin::Prelude(Prelude::Program | Prelude::UncheckedAccount) | Builtin::Pyth(Pyth::PriceAccount) => {
-                        TyExpr::Generic {
-                            mutability: Mutability::Immutable,
-                            name: vec!["UncheckedAccount".to_string()],
-                            params: vec![TyExpr::InfoLifetime],
-                        }
-                    }
+                    Builtin::Prelude(Prelude::Program | Prelude::UncheckedAccount)
+                    | Builtin::Pyth(Pyth::PriceAccount) => TyExpr::Generic {
+                        mutability: Mutability::Immutable,
+                        name: vec!["UncheckedAccount".to_string()],
+                        params: vec![TyExpr::InfoLifetime],
+                    },
                     // Clock -> Sysvar<'info, Clock>
                     Builtin::Prelude(Prelude::Clock) => TyExpr::Generic {
                         mutability: Mutability::Immutable,
@@ -982,6 +985,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
         let mut tree = tree
             .map_with_path(|(mut contexts, (mut signatures, namespace)), path| {
                 let mut artifact = Artifact {
+                    features: HashSet::new(),
                     uses: vec![Use { rooted: true, tree: Tree::Node(HashMap::new()) }],
                     directives: vec![],
                     constants: vec![],
@@ -1153,7 +1157,14 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
-                // Prune all Seahorse builtins
+                // Prune all Seahorse builtins after checking for dependencies ("if pyth is
+                // accessible then add it to the feature set")
+                if
+                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "pyth".to_string()]).is_some() ||
+                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "self".to_string()]).is_some()
+                {
+                    artifact.features.insert(Feature::Pyth);
+                }
                 artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);
