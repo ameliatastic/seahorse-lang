@@ -92,6 +92,12 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 }
             }
 
+            let mut cmd = "anchor".to_string();
+            for arg in args.iter() {
+                cmd.push(' ');
+                cmd.push_str(*arg);
+            }
+
             let anchor_output = Command::new("anchor").args(args).output()?;
             let stderr = String::from_utf8(anchor_output.stderr)?;
 
@@ -99,7 +105,7 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 || stderr.contains("error") | stderr.contains("panicked")
             {
                 return Err(
-                    error_message(format!("{} failed:\n{}", "anchor build", stderr)).into(),
+                    error_message(format!("{} failed:\n{}", cmd, stderr)).into(),
                 );
             }
 
