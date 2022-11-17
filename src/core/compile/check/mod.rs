@@ -15,7 +15,7 @@ use crate::core::{
 };
 use crate::match1;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::builtin::prelude::Transformed;
 
@@ -172,6 +172,10 @@ impl Ty {
         Ty::Generic(TyName::Builtin(Builtin::Prelude(builtin)), params)
     }
 
+    pub fn pyth(builtin: Pyth, params: Vec<Self>) -> Self {
+        Ty::Generic(TyName::Builtin(Builtin::Pyth(builtin)), params)
+    }
+
     pub fn new_function(params: Vec<(&'static str, Ty, ParamType)>, returns: Ty) -> Self {
         Self::Function(
             params
@@ -238,6 +242,8 @@ impl Ty {
     }
 
     /// Returns whether this type represents an account.
+    /// TODO this function is becoming a mess, could stand to refactor TyName
+    /// to include the "is_account" info
     pub fn is_account(&self) -> bool {
         match self {
             Ty::Generic(TyName::Builtin(Builtin::Prelude(builtin)), _) => match builtin {
@@ -251,6 +257,7 @@ impl Ty {
                 | Prelude::Clock => true,
                 _ => false,
             },
+            Ty::Generic(TyName::Builtin(Builtin::Pyth(Pyth::PriceAccount)), _) => true,
             Ty::Generic(TyName::Defined(_, DefinedType::Account), _) => true,
             _ => false,
         }

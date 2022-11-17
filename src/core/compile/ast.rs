@@ -1,12 +1,15 @@
 use proc_macro2::TokenStream;
 
-use super::{builtin::prelude::MethodType, check::Ty};
+use super::{super::generate::Feature, builtin::prelude::MethodType, check::Ty};
 use crate::core::Tree;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// A compilation artifact. Does not handle lib.rs, which will be generated separately.
+///
+/// Collects and propagates features to make generation a bit easier.
 #[derive(Clone, Debug)]
 pub struct Artifact {
+    pub features: HashSet<Feature>,
     pub uses: Vec<Use>,
     pub directives: Vec<Directive>,
     pub constants: Vec<Constant>,

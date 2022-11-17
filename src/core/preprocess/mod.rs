@@ -112,6 +112,7 @@ fn from_os_string(os: &OsStr) -> String {
 pub enum Module {
     Python(ca::Module),
     SeahorsePrelude,
+    SeahorsePyth,
 }
 
 /// A combined registry tree + filesystem path.
@@ -398,6 +399,14 @@ pub fn preprocess(module: ca::Module, working_dir: PathBuf) -> Result<ModuleRegi
                 "seahorse".to_string(),
                 "prelude".to_string(),
             ],
+            PathBuf::new(),
+        ),
+    )?;
+
+    builder.add_module(
+        Module::SeahorsePyth,
+        ComboPath::new(
+            vec!["sh".to_string(), "seahorse".to_string(), "pyth".to_string()],
             PathBuf::new(),
         ),
     )?;
