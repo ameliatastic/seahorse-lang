@@ -2,7 +2,7 @@
 // yet
 use crate::{
     core::{
-        clean::ast::{self, ComprehensionPart, Expression, ParamObj},
+        clean::ast::{self, ComprehensionPart, ParamObj},
         compile::{ast::*, builtin::*, check::*},
         generate::Feature,
         util::*,
@@ -12,11 +12,11 @@ use crate::{
 use heck::ToPascalCase;
 use quote::quote;
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     rc::Rc,
 };
 
-use super::{check::*, namespace::*, sign::*};
+use super::{namespace::*, sign::*};
 
 enum Error {
     InvalidDecorator(Ty),
@@ -341,7 +341,7 @@ impl<'a> Context<'a> {
                         name,
                         params,
                         accounts,
-                        inferred_accounts: HashMap::new(),
+                        inferred_accounts: BTreeMap::new(),
                     });
                 }
                 dec => {
@@ -987,7 +987,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
         let mut tree = tree
             .map_with_path(|(mut contexts, (mut signatures, namespace)), path| {
                 let mut artifact = Artifact {
-                    features: HashSet::new(),
+                    features: BTreeSet::new(),
                     uses: vec![Use { rooted: true, tree: Tree::Node(HashMap::new()) }],
                     directives: vec![],
                     constants: vec![],

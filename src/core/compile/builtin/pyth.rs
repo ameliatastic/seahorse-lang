@@ -2,6 +2,8 @@
 
 // why does every builtin have to start with a P
 
+use std::collections::BTreeMap;
+
 use crate::core::compile::builtin::*;
 pub use crate::core::{
     compile::{ast::*, build::*, check::*, namespace::*, sign::*},
@@ -29,7 +31,7 @@ pub fn namespace() -> Namespace {
         ("Price", Pyth::Price),
     ];
 
-    let mut namespace = HashMap::new();
+    let mut namespace = BTreeMap::new();
     for (name, obj) in data.into_iter() {
         namespace.insert(
             name.to_string(),

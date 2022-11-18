@@ -1,5 +1,4 @@
 use crate::core::{compile::check::*, util::*};
-pub use std::collections::HashMap;
 
 pub mod prelude;
 pub mod pyth;

@@ -7,17 +7,17 @@ use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
 #[cfg(not(target_arch = "wasm32"))]
 use rustfmt_wrapper::{config::*, rustfmt_config, Error as RustfmtError};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
+use std::{cell::RefCell, collections::BTreeSet, rc::Rc};
 
 use super::compile::builtin::prelude::MethodType;
 
 pub struct GenerateOutput {
     pub tree: Tree<String>,
-    pub features: HashSet<Feature>,
+    pub features: BTreeSet<Feature>,
 }
 
 /// A set of features that need to be turned on in order to compile an artifact.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Feature {
     Pyth,
 }
@@ -1518,7 +1518,7 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
         let origin = build_output.tree.get_leaf(&build_output.origin).unwrap();
         let lib = make_lib(origin, &build_output.origin, &program_name)?;
 
-        let features = Rc::new(RefCell::new(HashSet::new()));
+        let features = Rc::new(RefCell::new(BTreeSet::new()));
 
         let mut tree = build_output
             .tree

@@ -7,6 +7,7 @@ pub use crate::core::{
 };
 use crate::match1;
 use quote::quote;
+use std::collections::BTreeMap;
 pub use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -78,7 +79,7 @@ pub fn namespace() -> Namespace {
         ("instruction", Prelude::Instruction),
     ];
 
-    let mut namespace = HashMap::new();
+    let mut namespace = BTreeMap::new();
     for (name, obj) in data.into_iter() {
         namespace.insert(
             name.to_string(),
