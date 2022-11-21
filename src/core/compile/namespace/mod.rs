@@ -7,7 +7,7 @@ use crate::core::{
     preprocess::{self as pre, Module},
     util::*,
 };
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 enum Error {
     ImportNotFound(Vec<String>),
@@ -68,7 +68,7 @@ pub struct NamespaceOutput {
 }
 
 /// The (global) namespace for a module.
-pub type Namespace = HashMap<String, Export>;
+pub type Namespace = BTreeMap<String, Export>;
 
 impl Tree<Namespace> {
     /// Get an item given an absolute path.
@@ -328,7 +328,7 @@ fn build_python_namespace(
     path: &Vec<String>,
     module: &ca::Module,
 ) -> CResult<Namespace> {
-    let mut namespace = HashMap::new();
+    let mut namespace = BTreeMap::new();
 
     for statement in module.statements.iter() {
         let Located(loc, obj) = statement;
