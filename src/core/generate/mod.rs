@@ -634,9 +634,8 @@ impl ToTokens for AccountTyExpr {
                 quote! { #ty_expr }
             }
             Self::Defined(ty_expr) => {
-                // let ty_expr = ContextBaseTyExpr(ty_expr);
-                let ty_expr = StaticPath(ty_expr);
-
+                // Get the last part of the path
+                let ty_expr = ident(ty_expr.last().unwrap());
                 quote! { Box<Account<'info, #ty_expr>> }
             }
             Self::Signer => quote! { Signer<'info> },
