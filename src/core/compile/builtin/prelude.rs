@@ -1136,7 +1136,7 @@ impl BuiltinSource for Prelude {
                     (
                         "program_id",
                         Ty::prelude(Self::Pubkey, vec![]),
-                        ParamType::Required,
+                        ParamType::Optional,
                     ),
                 ],
                 Ty::Transformed(
@@ -1152,12 +1152,15 @@ impl BuiltinSource for Prelude {
                         let mut args =
                             match1!(expr.obj, ExpressionObj::Call { args, .. } => args.into_iter());
                         let seeds = args.next().unwrap();
-                        let program_id = args.next().unwrap();
+                        let program_id = match args.next().unwrap().obj {
+                            ExpressionObj::Placeholder => quote! { &id() },
+                            obj => quote! { &#obj }
+                        };
 
                         expr.obj = ExpressionObj::Rendered(quote! {
                             Pubkey::find_program_address(
                                 #seeds.borrow().as_slice(),
-                                &#program_id
+                                #program_id
                             )
                         });
 
