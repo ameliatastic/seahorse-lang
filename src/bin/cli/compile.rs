@@ -22,11 +22,11 @@ pub struct CompileArgs {
 }
 
 /// Flatten a generated filetree into a single string with filename headers.
-fn flatten(tree: &GenerateOutput) -> String {
+fn flatten(tree: &Tree<String>) -> String {
     _flatten(tree, &mut vec![])
 }
 
-fn _flatten(tree: &GenerateOutput, path: &mut Vec<String>) -> String {
+fn _flatten(tree: &Tree<String>, path: &mut Vec<String>) -> String {
     match tree {
         Tree::Node(dir) => {
             let mut cat = String::new();
@@ -105,7 +105,7 @@ pub fn compile(args: CompileArgs) -> Result<(), Box<dyn Error>> {
 
     let rs_src = seahorse_compile(py_src, program_name, working_dir)?;
 
-    output.write_all(flatten(&rs_src).as_bytes())?;
+    output.write_all(flatten(&rs_src.tree).as_bytes())?;
 
     Ok(())
 }

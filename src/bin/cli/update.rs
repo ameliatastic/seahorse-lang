@@ -19,6 +19,9 @@ pub fn update_prelude(root: PathBuf) -> Result<(), Box<dyn Error>> {
     let mut prelude = File::create(lib_path.join("prelude.py"))?;
     prelude.write_all(data::SEAHORSE_PRELUDE.as_bytes())?;
 
+    let mut pyth = File::create(lib_path.join("pyth.py"))?;
+    pyth.write_all(data::SEAHORSE_PYTH.as_bytes())?;
+
     return Ok(());
 }
 

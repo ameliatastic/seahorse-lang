@@ -1,12 +1,15 @@
 use proc_macro2::TokenStream;
 
-use super::{builtin::prelude::MethodType, check::Ty};
+use super::{super::generate::Feature, builtin::prelude::MethodType, check::Ty};
 use crate::core::Tree;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A compilation artifact. Does not handle lib.rs, which will be generated separately.
+///
+/// Collects and propagates features to make generation a bit easier.
 #[derive(Clone, Debug)]
 pub struct Artifact {
+    pub features: BTreeSet<Feature>,
     pub uses: Vec<Use>,
     pub directives: Vec<Directive>,
     pub constants: Vec<Constant>,
@@ -132,7 +135,7 @@ pub struct InstructionContext {
     pub name: String,
     pub params: Vec<(String, TyExpr)>,
     pub accounts: Vec<(String, ContextAccount)>,
-    pub inferred_accounts: HashMap<String, ContextAccount>,
+    pub inferred_accounts: BTreeMap<String, ContextAccount>,
 }
 
 #[derive(Clone, Debug)]

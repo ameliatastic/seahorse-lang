@@ -13,7 +13,7 @@ use std::{
     path::Path,
     process::Command,
 };
-use toml_edit::{value, Document, Item};
+use toml_edit::{Document, Formatted, InlineTable, Item, Table, Value};
 
 #[derive(Args, Debug)]
 pub struct InitArgs {
@@ -205,6 +205,14 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             let anchor_version = cargo["dependencies"]["anchor-lang"].clone();
             cargo["dependencies"]["anchor-lang"] = anchor_version.clone();
             cargo["dependencies"]["anchor-spl"] = anchor_version;
+
+            let mut pyth = InlineTable::new();
+            pyth.insert(
+                "version",
+                Value::String(Formatted::new("0.6.1".to_string())),
+            );
+            pyth.insert("optional", Value::Boolean(Formatted::new(true)));
+            cargo["dependencies"]["pyth-sdk-solana"] = Item::Value(Value::InlineTable(pyth));
 
             File::create(&cargo_path)?.write_all(cargo.to_string().as_bytes())?;
 

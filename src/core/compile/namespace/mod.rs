@@ -1,9 +1,13 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
 use crate::core::{
-    clean::ast as ca, compile::builtin::*, compile::check::*, preprocess as pre, util::*,
+    clean::ast as ca,
+    compile::builtin::*,
+    compile::check::*,
+    preprocess::{self as pre, Module},
+    util::*,
 };
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 enum Error {
     ImportNotFound(Vec<String>),
@@ -64,7 +68,7 @@ pub struct NamespaceOutput {
 }
 
 /// The (global) namespace for a module.
-pub type Namespace = HashMap<String, Export>;
+pub type Namespace = BTreeMap<String, Export>;
 
 impl Tree<Namespace> {
     /// Get an item given an absolute path.
@@ -183,7 +187,11 @@ impl TryFrom<pre::ModuleRegistry> for NamespaceOutput {
     type Error = CoreError;
 
     fn try_from(registry: pre::ModuleRegistry) -> CResult<NamespaceOutput> {
-        let mut wip = registry.tree.clone().map(|_| Wip::Empty);
+        let mut wip = registry.tree.clone().map(|module| match module {
+            Module::Python(..) => Wip::Empty,
+            Module::SeahorsePrelude => Wip::Done(prelude::namespace()),
+            Module::SeahorsePyth => Wip::Done(pyth::namespace()),
+        });
 
         build_namespace(&mut wip, &registry, &registry.origin)?;
 
@@ -290,7 +298,7 @@ fn build_namespace(
             let module = match1!(registry.tree.get(path).unwrap(), Tree::Leaf(module) => module);
             let namespace = match module {
                 pre::Module::Python(module) => build_python_namespace(wip, registry, path, module)?,
-                pre::Module::SeahorsePrelude => prelude::namespace(),
+                _ => panic!(),
             };
 
             *wip.get_mut(path).unwrap() = Tree::Leaf(Wip::Done(namespace));
@@ -320,7 +328,7 @@ fn build_python_namespace(
     path: &Vec<String>,
     module: &ca::Module,
 ) -> CResult<Namespace> {
-    let mut namespace = HashMap::new();
+    let mut namespace = BTreeMap::new();
 
     for statement in module.statements.iter() {
         let Located(loc, obj) = statement;
