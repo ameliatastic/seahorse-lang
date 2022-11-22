@@ -1123,7 +1123,54 @@ impl BuiltinSource for Prelude {
     }
 
     fn static_attr(&self, attr: &String) -> Option<Ty> {
-        None
+        match (self, attr.as_str()) {
+            (Self::Pubkey, "find_program_address") => Some(Ty::new_function(
+                vec![
+                    (
+                        "seeds",
+                        Ty::python(
+                            Python::List,
+                            vec![Ty::Cast(Ty::prelude(Self::Seed, vec![]).into())],
+                        ),
+                        ParamType::Required,
+                    ),
+                    (
+                        "program_id",
+                        Ty::prelude(Self::Pubkey, vec![]),
+                        ParamType::Optional,
+                    ),
+                ],
+                Ty::Transformed(
+                    Ty::python(
+                        Python::Tuple,
+                        vec![
+                            Ty::prelude(Self::Pubkey, vec![]),
+                            Ty::prelude(Self::RustInt(false, 8), vec![]),
+                        ],
+                    )
+                    .into(),
+                    Transformation::new(|mut expr| {
+                        let mut args =
+                            match1!(expr.obj, ExpressionObj::Call { args, .. } => args.into_iter());
+                        let seeds = args.next().unwrap();
+                        let program_id = match args.next().unwrap().obj {
+                            ExpressionObj::Placeholder => quote! { &id() },
+                            obj => quote! { &#obj }
+                        };
+
+                        expr.obj = ExpressionObj::Rendered(quote! {
+                            Pubkey::find_program_address(
+                                #seeds.borrow().as_slice(),
+                                #program_id
+                            )
+                        });
+
+                        Ok(Transformed::Expression(expr))
+                    }),
+                ),
+            )),
+            _ => None,
+        }
     }
 
     fn casted(&self, ty: &Ty) -> Option<(Ty, Ty)> {

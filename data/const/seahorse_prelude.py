@@ -660,6 +660,15 @@ class Enum:
 class Pubkey:
     """32-byte account identifier."""
 
+    def find_program_address(seeds: List[Any], program_id: 'Pubkey' = None) -> Tuple['Pubkey', u8]:
+        """
+        Find a valid program derived address and its corresponding bump seed. Calls the same function from Solana's Pubkey struct - read more [here](https://docs.rs/solana-program/latest/solana_program/pubkey/struct.Pubkey.html#method.find_program_address).
+        
+        @param seeds: A list of parameters to uniquely identify this account among all accounts created by your program. These may be string literals, other accounts, integers, or lists of bytes.
+        @param program_id: The pubkey of the program that the PDA belongs to. Defaults to the current program's key.
+        @returns: The canonical pubkey and bump seed.
+        """
+
 class AccountWithKey:
     """Generic Solana account."""
 

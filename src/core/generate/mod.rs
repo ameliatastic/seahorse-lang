@@ -61,7 +61,7 @@ impl ToTokens for Artifact {
             #![allow(unused_mut)]
 
             // Default imports
-            use crate::{assign, index_assign, seahorse_util::*};
+            use crate::{id, assign, index_assign, seahorse_util::*};
             use std::{rc::Rc, cell::RefCell};
             use anchor_lang::{prelude::*, solana_program};
             // TODO might not need these, contexts are defined in lib.rs now
