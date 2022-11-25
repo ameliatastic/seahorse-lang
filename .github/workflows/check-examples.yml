@@ -1,0 +1,28 @@
+name: check-examples
+
+# Run on pushes to main, all pull requests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+
+jobs:
+  check-examples:
+    name: Check Examples
+    runs-on: ubuntu-latest
+    steps:
+      # checkout + build
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+      # See https://github.com/Swatinem/rust-cache
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      # compile the examples + check for changes
+      - name: Compile all examples
+        run: ./tests/compile-examples.sh
+      - name: Check for any changes
+        run: ./tests/check-for-changes.sh
