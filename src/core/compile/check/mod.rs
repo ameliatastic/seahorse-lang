@@ -806,14 +806,7 @@ impl<'a> Context<'a> {
                                 vec![],
                                 Ty::Transformed(
                                     Ty::prelude(Prelude::Pubkey, vec![]).into(),
-                                    Transformation::new(|mut expr| {
-                                        let account = match1!(expr.obj, ExpressionObj::Call { function, .. } => *function);
-                                        let account = match1!(account.obj, ExpressionObj::Attribute { value, .. } => *value);
-
-                                        expr.obj = ExpressionObj::Rendered(quote! {
-                                            #account.borrow().__account__.key()
-                                        });
-
+                                    Transformation::new(|expr| { 
                                         Ok(Transformed::Expression(expr))
                                     })
                                 )
