@@ -12,11 +12,12 @@ pub fn compile(
     program_name: String,
     working_dir: Option<PathBuf>,
 ) -> Result<GenerateOutput, CoreError> {
-    let python_source_ = python_source.clone();
-
-    let working_dir = working_dir.unwrap_or(
-        current_dir().map_err(|_| CoreError::make_raw("Could not get current directory", ""))?,
-    );
+    let working_dir = match working_dir {
+        Some(dir) => dir,
+        None => {
+            current_dir().map_err(|_| CoreError::make_raw("Could not get current directory", ""))?
+        }
+    };
 
     let parsed = parse(python_source.clone())?;
     let cleaned = clean(parsed, python_source)?;
