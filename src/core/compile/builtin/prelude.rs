@@ -950,7 +950,7 @@ impl BuiltinSource for Prelude {
                             let mint = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
 
                             expr.obj = ExpressionObj::Rendered(quote! {
-                                #mint.owner
+                                #mint.mint_authority.unwrap()
                             });
 
                             Ok(Transformed::Expression(expr))
