@@ -200,12 +200,9 @@ impl ToTokens for Struct {
         // `impl Class` block.
 
         let event_emit_fn = if *is_event {
-            let fs = fields.iter().map(|(name, ty)| {
+            let fs = fields.iter().map(|(name, ty, original_ty)| {
                 let name = ident(name);
-                let needs_clone = match ty {
-                    TyExpr::Generic { name, .. } if name[0] == "String" => true,
-                    _ => false,
-                };
+                let needs_clone = !original_ty.is_copy();
 
                 if needs_clone {
                     quote! { #name: e.#name.clone() }
@@ -251,7 +248,7 @@ impl ToTokens for Struct {
             }
         };
 
-        let fields = fields.iter().map(|(name, ty)| {
+        let fields = fields.iter().map(|(name, ty, _)| {
             let name = ident(name);
 
             quote! { pub #name: #ty }
