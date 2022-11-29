@@ -1086,7 +1086,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                                 } else {
                                                     TypeDef::Struct(Struct {
                                                         name,
-                                                        fields: fields.into_iter().map(|(name, ty_expr, ty)| (name, ty_expr, ty)).collect(),
+                                                        fields,
                                                         methods,
                                                         constructor,
                                                         is_event,
