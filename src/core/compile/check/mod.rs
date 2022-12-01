@@ -199,8 +199,6 @@ impl Ty {
                 | Prelude::RustInt(..)
                 | Prelude::Pubkey
                 | Prelude::Empty
-                | Prelude::TokenMint
-                | Prelude::TokenAccount
                 | Prelude::Clock => false,
                 _ => true,
             },
