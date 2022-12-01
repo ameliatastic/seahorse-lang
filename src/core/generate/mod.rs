@@ -200,13 +200,20 @@ impl ToTokens for Struct {
         // `impl Class` block.
 
         let event_emit_fn = if *is_event {
-            let fs = fields.iter().map(|(name, _)| {
+            let fs = fields.iter().map(|(name, ty, original_ty)| {
                 let name = ident(name);
-                quote! { #name: self.borrow().#name }
+                let needs_clone = !original_ty.is_copy();
+
+                if needs_clone {
+                    quote! { #name: e.#name.clone() }
+                } else {
+                    quote! { #name: e.#name }
+                }
             });
 
             Some(quote! {
                 fn __emit__(&self) {
+                    let e = self.borrow();
                     emit!(#name { #(#fs),* })
                 }
             })
@@ -241,7 +248,7 @@ impl ToTokens for Struct {
             }
         };
 
-        let fields = fields.iter().map(|(name, ty)| {
+        let fields = fields.iter().map(|(name, ty, _)| {
             let name = ident(name);
 
             quote! { pub #name: #ty }

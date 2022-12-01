@@ -47,7 +47,7 @@ pub enum TypeDef {
 #[derive(Clone, Debug)]
 pub struct Struct {
     pub name: String,
-    pub fields: Vec<(String, TyExpr)>,
+    pub fields: Vec<(String, TyExpr, Ty)>,
     pub methods: Vec<(MethodType, Function)>,
     pub constructor: Option<Function>,
     pub is_event: bool,
