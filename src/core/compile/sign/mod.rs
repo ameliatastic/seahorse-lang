@@ -56,12 +56,15 @@ impl Error {
                 "Help: new accounts must be created through the Solana system program, try using the Empty.init(...) syntax instead."
             ),
             Self::InvalidClassDecorator(dec) => {
-                CoreError::make_raw(format!("\"{:?}\" is not a valid decorator", dec), "")
+                CoreError::make_raw(
+                    format!("\"{:#?}\" is not a valid decorator", dec), 
+                    "Decorators must be a string"
+                )
             }
             Self::UnsupportedClassDecorator(dec) => {
                 CoreError::make_raw(
                     format!("{} is not a supported class decorator", dec),
-                    "Hint: Only dataclass is currently supported for classes",
+                    "Hint: Only dataclass is currently supported for classes. Imported paths like \"seahorse.prelude.dataclass\" are not currently supported.",
                 )
             }
             Self::DuplicateClassField(field) => {
@@ -306,6 +309,9 @@ fn build_signature(
                     }
                     ca::ExpressionObj::Id(d) => {
                         return Err(Error::UnsupportedClassDecorator(d.to_string()).core(&loc))
+                    }
+                    ca::ExpressionObj::Attribute { name, .. } => {
+                        return Err(Error::UnsupportedClassDecorator(name.to_string()).core(&loc))
                     }
                     _ => return Err(Error::InvalidClassDecorator(decorator.clone()).core(&loc)),
                 }
