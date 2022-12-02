@@ -104,7 +104,14 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
             if !anchor_output.status.success()
                 || stderr.contains("error") | stderr.contains("panicked")
             {
-                return Err(error_message(format!("{} failed:\n{}", cmd, stderr)).into());
+                let report_note = concat!(
+                    "This is most likely a bug in the Seahorse compiler!\n\n",
+                    "If you want to help the project, you can report this:\n",
+                    "  - on the Seahorse Discord (http://discord.gg/4sFzH5pus8)\n",
+                    "  - or as a Github issue (https://github.com/ameliatastic/seahorse-lang/issues).\n\n",
+                    "Thanks!"
+                ).bold();
+                return Err(error_message(format!("{} failed:\n\n{}\n\n{}", cmd, report_note, stderr)).into());
             }
 
             return Ok(anchor_output.stdout);
