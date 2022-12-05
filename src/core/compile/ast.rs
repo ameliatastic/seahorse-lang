@@ -51,6 +51,7 @@ pub struct Struct {
     pub methods: Vec<(MethodType, Function)>,
     pub constructor: Option<Function>,
     pub is_event: bool,
+    pub is_dataclass: bool,
 }
 
 /// An Anchor account definition.

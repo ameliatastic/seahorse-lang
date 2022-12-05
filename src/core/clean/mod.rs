@@ -11,7 +11,6 @@ use ast::*;
 enum Error {
     ImportAlias,
     ClassDefWithKeywords,
-    ClassDefWithDecorators,
     Async,
     ArbitraryTopLevelStatementObj,
     ArbitraryClassDefStatement,
@@ -55,7 +54,6 @@ impl Error {
         match self {
             Self::ImportAlias => CoreError::make_raw("imports aliases are currently not supported", ""),
             Self::ClassDefWithKeywords => CoreError::make_raw("class definition with keywords", ""),
-            Self::ClassDefWithDecorators => CoreError::make_raw("class definition with decorators", ""),
             Self::Async => CoreError::make_raw("functions may not be async", ""),
             Self::ArbitraryTopLevelStatementObj => CoreError::make_raw(
                 "arbitrary top-level statement",
@@ -269,8 +267,6 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
             } => {
                 if keywords.len() > 0 {
                     Err(Error::ClassDefWithKeywords)
-                } else if decorator_list.len() > 0 {
-                    Err(Error::ClassDefWithDecorators)
                 } else {
                     Ok(TopLevelStatementObj::ClassDef {
                         name,
@@ -281,6 +277,10 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                         bases: bases
                             .into_iter()
                             .map(|base| WithSrc::new(&src, base).try_into())
+                            .collect::<Result<Vec<_>, CoreError>>()?,
+                        decorator_list: decorator_list
+                            .into_iter()
+                            .map(|dec| WithSrc::new(&src, dec).try_into())
                             .collect::<Result<Vec<_>, CoreError>>()?,
                     })
                 }

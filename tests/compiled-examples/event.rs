@@ -21,14 +21,6 @@ pub struct HelloEvent {
 }
 
 impl Mutable<HelloEvent> {
-    pub fn __init__(&self, mut data: u8, mut title: String, mut owner: Pubkey) -> () {
-        assign!(self.borrow_mut().data, data);
-
-        assign!(self.borrow_mut().title, title);
-
-        assign!(self.borrow_mut().owner, owner);
-    }
-
     fn __emit__(&self) {
         let e = self.borrow();
 
@@ -42,11 +34,9 @@ impl Mutable<HelloEvent> {
 
 impl HelloEvent {
     pub fn __new__(data: u8, title: String, owner: Pubkey) -> Mutable<Self> {
-        let obj = Mutable::new(HelloEvent::default());
+        let obj = HelloEvent { data, title, owner };
 
-        obj.__init__(data, title, owner);
-
-        return obj;
+        return Mutable::new(obj);
     }
 }
 

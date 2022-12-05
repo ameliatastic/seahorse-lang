@@ -1036,7 +1036,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                         ) => match signature {
                                             Signature::Class(ClassSignature::Struct(
                                                 StructSignature {
-                                                    is_account, is_event, fields: mut fields_map, methods: mut methods_map, ..
+                                                    is_account, is_event, is_dataclass, fields: mut fields_map, methods: mut methods_map, ..
                                                 },
                                             )) => {
                                                 let mut fields = vec![];
@@ -1090,6 +1090,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                                         methods,
                                                         constructor,
                                                         is_event,
+                                                        is_dataclass,
                                                     })
                                                 };
 

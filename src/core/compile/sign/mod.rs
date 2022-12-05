@@ -1,7 +1,7 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
 use crate::core::{
-    clean::ast as ca,
+    clean::ast::{self as ca, ParamObj, Params},
     compile::{
         ast::ExpressionObj,
         build::{Transformation, Transformed},
@@ -26,6 +26,9 @@ enum Error {
     InvalidClassField,
     InvalidClassConstructor,
     AccountConstructor,
+    InvalidClassDecorator(ca::ExpressionObj),
+    UnsupportedClassDecorator(String),
+    DuplicateClassField(String),
 }
 
 impl Error {
@@ -51,7 +54,25 @@ impl Error {
             Self::AccountConstructor => CoreError::make_raw(
                 "accounts may not have constructors",
                 "Help: new accounts must be created through the Solana system program, try using the Empty.init(...) syntax instead."
-            )
+            ),
+            Self::InvalidClassDecorator(dec) => {
+                CoreError::make_raw(
+                    format!("\"{:#?}\" is not a valid decorator", dec), 
+                    "Decorators must be a string"
+                )
+            }
+            Self::UnsupportedClassDecorator(dec) => {
+                CoreError::make_raw(
+                    format!("{} is not a supported class decorator", dec),
+                    "Hint: Only dataclass is currently supported for classes. Imported paths like \"seahorse.prelude.dataclass\" are not currently supported.",
+                )
+            }
+            Self::DuplicateClassField(field) => {
+                CoreError::make_raw(
+                    format!("duplicate class field {}", field),
+                    "Hint: a field can only be declared in a class once"
+                )
+            }
         }
         .located(loc.clone())
     }
@@ -89,6 +110,7 @@ pub enum ClassSignature {
 pub struct StructSignature {
     pub is_account: bool,
     pub is_event: bool,
+    pub is_dataclass: bool,
     pub bases: Vec<Ty>,
     pub fields: HashMap<String, Ty>,
     pub methods: HashMap<String, (MethodType, FunctionSignature)>,
@@ -218,12 +240,14 @@ impl TryFrom<NamespaceOutput> for SignOutput {
                         Signature::Class(ClassSignature::Struct(StructSignature {
                             is_account,
                             is_event,
+                            is_dataclass,
                             bases,
                             fields,
                             methods,
                         })) => Signature::Class(ClassSignature::Struct(StructSignature {
                             is_account,
                             is_event,
+                            is_dataclass,
                             bases,
                             fields: fields
                                 .into_iter()
@@ -266,11 +290,33 @@ fn build_signature(
     let Located(loc, obj) = def;
 
     match obj {
-        ca::TopLevelStatementObj::ClassDef { body, bases, .. } => {
+        ca::TopLevelStatementObj::ClassDef {
+            body,
+            bases,
+            decorator_list,
+            ..
+        } => {
             let mut is_account = false;
             let mut is_enum = false;
             let mut is_event = false;
             let mut bases_ = vec![];
+            let mut is_dataclass = false;
+
+            for Located(loc, decorator) in decorator_list.into_iter() {
+                match decorator {
+                    ca::ExpressionObj::Id(d) if d == "dataclass" => {
+                        is_dataclass = true;
+                    }
+                    ca::ExpressionObj::Id(d) => {
+                        return Err(Error::UnsupportedClassDecorator(d.to_string()).core(&loc))
+                    }
+                    ca::ExpressionObj::Attribute { name, .. } => {
+                        return Err(Error::UnsupportedClassDecorator(name.to_string()).core(&loc))
+                    }
+                    _ => return Err(Error::InvalidClassDecorator(decorator.clone()).core(&loc)),
+                }
+            }
+
             for base in bases.iter() {
                 let base = root.build_ty(base, abs)?;
                 match base {
@@ -327,7 +373,9 @@ fn build_signature(
                 })))
             } else {
                 let mut fields = HashMap::new();
+                let mut fields_ordered = vec![];
                 let mut methods = HashMap::new();
+                let mut has_ctor = false;
 
                 for statement in body.iter() {
                     let Located(loc, obj) = statement;
@@ -338,7 +386,17 @@ fn build_signature(
                                 return Err(Error::InvalidClassField.core(loc));
                             }
 
-                            fields.insert(name.clone(), root.build_ty(&ty.as_ref().unwrap(), abs)?);
+                            let field_ty = root.build_ty(&ty.as_ref().unwrap(), abs)?;
+
+                            let existing_field = fields.insert(name.clone(), field_ty);
+
+                            if existing_field.is_some() {
+                                return Err(Error::DuplicateClassField(name.clone()).core(loc));
+                            }
+
+                            let ty_expr = ty.as_ref().unwrap().clone();
+
+                            fields_ordered.push((name, ty_expr));
                         }
                         ca::ClassDefStatementObj::MethodDef(ca::FunctionDef {
                             name,
@@ -354,6 +412,7 @@ fn build_signature(
                                     if returns.is_some() {
                                         return Err(Error::InvalidClassConstructor.core(loc));
                                     }
+                                    has_ctor = true;
                                 }
 
                                 methods.insert(
@@ -380,10 +439,40 @@ fn build_signature(
                     }
                 }
 
+                if !has_ctor && is_dataclass {
+                    // If there is no constructor for a dataclass, then for typechecking purposes
+                    // we add a __init__ function, which takes all fields as params, and returns None
+
+                    // Convert the fields to param objects
+                    let param_objs = fields_ordered.iter().map(|(name, ty_expr)| ParamObj {
+                        arg: name.to_string(),
+                        annotation: ty_expr.clone(),
+                    });
+
+                    let params: Params = Params {
+                        is_instance_method: true,
+                        params: param_objs
+                            .map(|p| Located(loc.clone(), p.clone()))
+                            .collect::<Vec<Located<ParamObj>>>(),
+                    };
+
+                    methods.insert(
+                        String::from("__init__"),
+                        (
+                            MethodType::Instance,
+                            build_function_signature(&params, &None, abs, root)?,
+                        ),
+                    );
+                }
+
                 Ok(Signature::Class(ClassSignature::Struct(StructSignature {
                     is_account,
                     is_event,
-                    fields,
+                    is_dataclass,
+                    fields: fields
+                        .iter()
+                        .map(|(name, ty)| (name.clone(), ty.clone()))
+                        .collect::<HashMap<String, Ty>>(),
                     bases: bases_,
                     methods,
                 })))

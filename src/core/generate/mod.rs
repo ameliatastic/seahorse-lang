@@ -147,6 +147,7 @@ impl ToTokens for Struct {
             methods,
             constructor,
             is_event,
+            is_dataclass,
         } = self;
         let name = ident(name);
 
@@ -178,6 +179,25 @@ impl ToTokens for Struct {
                     let obj = Mutable::new(#name::default());
                     obj.__init__(#(#ext_param_names),*);
                     return obj;
+                }
+            });
+        } else if *is_dataclass {
+            let ctor_params = fields.iter().map(|(name, ty_expr, _)| {
+                let name = ident(name);
+
+                quote! { #name: #ty_expr }
+            });
+
+            let ctor_param_names = fields.iter().map(|(name, _, _)| {
+                let name = ident(name);
+
+                quote! { #name }
+            });
+
+            static_methods.push(quote! {
+                pub fn __new__(#(#ctor_params), *) -> Mutable<Self> {
+                    let obj = #name { #(#ctor_param_names),* };
+                    return Mutable::new(obj);
                 }
             });
         }
