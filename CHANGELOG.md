@@ -12,11 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pubkey.find_program_address()` function, to find a PDA given a list of seeds and the program key
 - Decorator @dataclass for classes to automatically generate a default constructor
 
-
 ### Fixed
 
 - `TokenMint.authority()` works
 - Support strings in events
+- Bug where syntactic transformations would be duplicated in some arithmetic expressions
+- Make token mints and accounts mutable in instruction contexts
 
 ## [0.2.4]
 
