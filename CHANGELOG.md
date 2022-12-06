@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5]
+
 ### Added
 
 - `Pubkey.find_program_address()` function, to find a PDA given a list of seeds and the program key
