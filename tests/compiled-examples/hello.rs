@@ -296,11 +296,11 @@ mod hello {
 
     #[derive(Accounts)]
     pub struct SayHello<'info> {
-        #[account()]
+        #[account(mut)]
         pub user_acc: Box<Account<'info, TokenAccount>>,
         #[account(mut)]
         pub hello: Box<Account<'info, dot::program::Hello>>,
-        #[account()]
+        #[account(mut)]
         pub mint: Box<Account<'info, Mint>>,
         pub token_program: Program<'info, Token>,
     }

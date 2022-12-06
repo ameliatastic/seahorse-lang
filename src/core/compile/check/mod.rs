@@ -199,8 +199,6 @@ impl Ty {
                 | Prelude::RustInt(..)
                 | Prelude::Pubkey
                 | Prelude::Empty
-                | Prelude::TokenMint
-                | Prelude::TokenAccount
                 | Prelude::Clock => false,
                 _ => true,
             },
@@ -1667,7 +1665,11 @@ impl<'a> Context<'a> {
                 if !assign {
                     let ty = self.check_binop_sides(left, right, loc)?;
 
-                    self.unify(expr_ty, ty, loc)
+                    let ty = self.unify(expr_ty, ty, loc)?;
+                    Ok(match ty {
+                        Ty::Transformed(ty, _) => *ty,
+                        ty => ty,
+                    })
                 } else {
                     let param = self.free();
                     self.check_expr(Ty::Param(param), left)?;
