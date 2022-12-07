@@ -409,7 +409,6 @@ pub enum Assign {
         undeclared: Vec<String>,
         target: Target,
     },
-    Placeholder
 }
 
 #[derive(Clone, Debug)]
@@ -1077,7 +1076,10 @@ impl<'a> Context<'a> {
                 match (as_assignment_target(target), value) {
                     (Some(target), Some(value)) => {
                         let assign_i = self.assign_order.len();
-                        self.assign_order.push(Assign::Placeholder);
+                        self.assign_order.push(Assign::Declare {
+                            undeclared: vec![],
+                            target: target.clone(),
+                        });
 
                         let ty = self
                             .sign_output
@@ -1087,12 +1089,12 @@ impl<'a> Context<'a> {
 
                         self.check_expr(ty.clone(), value)?;
 
-                        let mut undeclared = vec![];
-                        let param_target = self.declare_target(&target, false, &mut undeclared)?;
-                        self.assign_order[assign_i] = Assign::Declare {
-                            undeclared,
-                            target: target.clone(),
-                        };
+                        let mut declarations = vec![];
+                        let param_target = self.declare_target(&target, false, &mut declarations)?;
+                        // Infallible
+                        if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                            *undeclared = declarations;
+                        }
 
                         self.unify(Ty::Param(param_target), ty, loc)?;
                     }
@@ -1105,17 +1107,20 @@ impl<'a> Context<'a> {
             ast::StatementObj::Assign { target, value } => match as_assignment_target(target) {
                 Some(target) => {
                     let assign_i = self.assign_order.len();
-                    self.assign_order.push(Assign::Placeholder);
+                    self.assign_order.push(Assign::Declare {
+                        undeclared: vec![],
+                        target: target.clone(),
+                    });
 
                     let param_value = self.free();
                     self.check_expr(Ty::Param(param_value), value)?;
 
-                    let mut undeclared = vec![];
-                    let param_target = self.declare_target(&target, false, &mut undeclared)?;
-                    self.assign_order[assign_i] = Assign::Declare {
-                        undeclared,
-                        target: target.clone(),
-                    };
+                    let mut declarations = vec![];
+                    let param_target = self.declare_target(&target, false, &mut declarations)?;
+                    // Infallible
+                    if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                        *undeclared = declarations;
+                    }
 
                     self.unify(Ty::Param(param_target), Ty::Param(param_value), loc)?;
                 }
