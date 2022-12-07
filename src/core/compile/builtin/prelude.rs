@@ -1078,6 +1078,27 @@ impl BuiltinSource for Prelude {
                     ),
                 ),
             )),
+            // TokenAccount.mint() -> Pubkey
+            (Self::TokenAccount, "mint") => Some((
+                Ty::prelude(Self::TokenAccount, vec![]),
+                Ty::new_function(
+                    vec![],
+                    Ty::Transformed(
+                        Ty::prelude(Self::Pubkey, vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let function =
+                                match1!(expr.obj, ExpressionObj::Call { function, .. } => function);
+                            let account = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #account.mint
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                ),
+            )),
             // UncheckedAccount.key() -> Pubkey
             (Self::UncheckedAccount, "key") => Some((
                 Ty::prelude(Self::UncheckedAccount, vec![]),
@@ -1155,7 +1176,7 @@ impl BuiltinSource for Prelude {
                         let seeds = args.next().unwrap();
                         let program_id = match args.next().unwrap().obj {
                             ExpressionObj::Placeholder => quote! { &id() },
-                            obj => quote! { &#obj }
+                            obj => quote! { &#obj },
                         };
 
                         expr.obj = ExpressionObj::Rendered(quote! {

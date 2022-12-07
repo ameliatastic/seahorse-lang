@@ -799,6 +799,9 @@ class TokenAccount(AccountWithKey):
     def amount(self) -> u64:
         """Get the amount of token stored in this account."""
 
+    def mint(self) -> Pubkey:
+        """Get the mint that this token account corresponds to."""
+
     def transfer(self, authority: AccountWithKey, to: 'TokenAccount', amount: u64, signer: List[Any] = None):
         """
         Transfer funds from this SPL token account to another.
