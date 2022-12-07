@@ -958,6 +958,69 @@ impl BuiltinSource for Prelude {
                     ),
                 ),
             )),
+            // TokenMint.freeze_authority() -> Pubkey
+            (Self::TokenMint, "freeze_authority") => Some((
+                Ty::prelude(Self::TokenMint, vec![]),
+                Ty::new_function(
+                    vec![],
+                    Ty::Transformed(
+                        Ty::prelude(Self::Pubkey, vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let function =
+                                match1!(expr.obj, ExpressionObj::Call { function, .. } => function);
+                            let mint = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #mint.freeze_authority.unwrap()
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                ),
+            )),
+            // TokenMint.decimals() -> u8
+            (Self::TokenMint, "decimals") => Some((
+                Ty::prelude(Self::TokenMint, vec![]),
+                Ty::new_function(
+                    vec![],
+                    Ty::Transformed(
+                        Ty::prelude(Self::RustInt(false, 8), vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let function =
+                                match1!(expr.obj, ExpressionObj::Call { function, .. } => function);
+                            let mint = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #mint.decimals
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                ),
+            )),
+            // TokenMint.supply() -> u64
+            (Self::TokenMint, "supply") => Some((
+                Ty::prelude(Self::TokenMint, vec![]),
+                Ty::new_function(
+                    vec![],
+                    Ty::Transformed(
+                        Ty::prelude(Self::RustInt(false, 64), vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let function =
+                                match1!(expr.obj, ExpressionObj::Call { function, .. } => function);
+                            let mint = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #mint.supply
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                ),
+            )),
             // TokenAccount.transfer(authority = Cast(Account), to = TokenAccount, amount = u64, signer = List[Cast(Seed)]?) -> None
             (Self::TokenAccount, "transfer") => Some((
                 Ty::prelude(Self::TokenAccount, vec![]),
@@ -1078,6 +1141,27 @@ impl BuiltinSource for Prelude {
                     ),
                 ),
             )),
+            // TokenAccount.mint() -> Pubkey
+            (Self::TokenAccount, "mint") => Some((
+                Ty::prelude(Self::TokenAccount, vec![]),
+                Ty::new_function(
+                    vec![],
+                    Ty::Transformed(
+                        Ty::prelude(Self::Pubkey, vec![]).into(),
+                        Transformation::new(|mut expr| {
+                            let function =
+                                match1!(expr.obj, ExpressionObj::Call { function, .. } => function);
+                            let account = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                            expr.obj = ExpressionObj::Rendered(quote! {
+                                #account.mint
+                            });
+
+                            Ok(Transformed::Expression(expr))
+                        }),
+                    ),
+                ),
+            )),
             // UncheckedAccount.key() -> Pubkey
             (Self::UncheckedAccount, "key") => Some((
                 Ty::prelude(Self::UncheckedAccount, vec![]),
@@ -1155,7 +1239,7 @@ impl BuiltinSource for Prelude {
                         let seeds = args.next().unwrap();
                         let program_id = match args.next().unwrap().obj {
                             ExpressionObj::Placeholder => quote! { &id() },
-                            obj => quote! { &#obj }
+                            obj => quote! { &#obj },
                         };
 
                         expr.obj = ExpressionObj::Rendered(quote! {

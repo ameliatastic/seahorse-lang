@@ -799,6 +799,9 @@ class TokenAccount(AccountWithKey):
     def amount(self) -> u64:
         """Get the amount of token stored in this account."""
 
+    def mint(self) -> Pubkey:
+        """Get the mint that this token account corresponds to."""
+
     def transfer(self, authority: AccountWithKey, to: 'TokenAccount', amount: u64, signer: List[Any] = None):
         """
         Transfer funds from this SPL token account to another.
@@ -813,7 +816,16 @@ class TokenMint(AccountWithKey):
     """SPL token mint."""
 
     def authority(self) -> Pubkey:
-        """Get the owner of this token account."""
+        """Get the owner of this token mint."""
+
+    def freeze_authority(self) -> Pubkey:
+        """Get the freeze authority of this token mint."""
+
+    def decimals(self) -> u8:
+        """Get the number of decimals for this token."""
+
+    def supply(self) -> u64:
+        """Get the amount of this token that exists."""
 
     def mint(self, authority: AccountWithKey, to: TokenAccount, amount: u64, signer: List[Any] = None):
         """
