@@ -706,7 +706,11 @@ impl<'a> Context<'a> {
     }
 
     /// Declare a target, creating a new type parameter for it.
-    fn declare_target(&mut self, target: &Target, force_declare: bool) -> CResult<usize> {
+    /// 
+    /// Also builds a list of the variable names that get declared by this
+    /// target. Declarations can happen due to the creation of a new free type,
+    /// or the modification of an existing type (according to the scoping rules).
+    fn declare_target(&mut self, target: &Target, force_declare: bool, declarations: &mut Vec<String>) -> CResult<usize> {
         match target {
             Target::Var(var) => {
                 if !force_declare {
@@ -718,6 +722,7 @@ impl<'a> Context<'a> {
                 }
 
                 let param = self.free();
+                declarations.push(var.clone());
                 self.scopes.last_mut().unwrap().insert(var.clone(), param);
 
                 Ok(param)
@@ -725,7 +730,7 @@ impl<'a> Context<'a> {
             Target::Tuple(tuple) => {
                 let params = tuple
                     .iter()
-                    .map(|target| Ok(Ty::Param(self.declare_target(target, force_declare)?)))
+                    .map(|target| Ok(Ty::Param(self.declare_target(target, force_declare, declarations)?)))
                     .collect::<Result<Vec<_>, CoreError>>()?;
 
                 let param = self.new_ty(Ty::python(Python::Tuple, params));
@@ -1070,9 +1075,9 @@ impl<'a> Context<'a> {
             ast::StatementObj::TyAssign { target, ty, value } => {
                 match (as_assignment_target(target), value) {
                     (Some(target), Some(value)) => {
-                        let undeclared = self.get_undeclared(&target, loc)?;
+                        let assign_i = self.assign_order.len();
                         self.assign_order.push(Assign::Declare {
-                            undeclared,
+                            undeclared: vec![],
                             target: target.clone(),
                         });
 
@@ -1084,7 +1089,13 @@ impl<'a> Context<'a> {
 
                         self.check_expr(ty.clone(), value)?;
 
-                        let param_target = self.declare_target(&target, false)?;
+                        let mut declarations = vec![];
+                        let param_target = self.declare_target(&target, false, &mut declarations)?;
+                        // Infallible
+                        if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                            *undeclared = declarations;
+                        }
+
                         self.unify(Ty::Param(param_target), ty, loc)?;
                     }
                     (Some(target), None) => {
@@ -1095,16 +1106,22 @@ impl<'a> Context<'a> {
             }
             ast::StatementObj::Assign { target, value } => match as_assignment_target(target) {
                 Some(target) => {
-                    let undeclared = self.get_undeclared(&target, loc)?;
+                    let assign_i = self.assign_order.len();
                     self.assign_order.push(Assign::Declare {
-                        undeclared,
+                        undeclared: vec![],
                         target: target.clone(),
                     });
 
                     let param_value = self.free();
                     self.check_expr(Ty::Param(param_value), value)?;
 
-                    let param_target = self.declare_target(&target, false)?;
+                    let mut declarations = vec![];
+                    let param_target = self.declare_target(&target, false, &mut declarations)?;
+                    // Infallible
+                    if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                        *undeclared = declarations;
+                    }
+
                     self.unify(Ty::Param(param_target), Ty::Param(param_value), loc)?;
                 }
                 None => {
@@ -1136,7 +1153,7 @@ impl<'a> Context<'a> {
                 self.scopes.push(HashMap::new());
                 match as_assignment_target(target) {
                     Some(target) => {
-                        let param_target = self.declare_target(&target, true)?;
+                        let param_target = self.declare_target(&target, true, &mut vec![])?;
                         self.assign_order.push(Assign::Declare {
                             undeclared: vec![],
                             target,
@@ -1346,7 +1363,7 @@ impl<'a> Context<'a> {
                             match as_assignment_target(target) {
                                 Some(target) => {
                                     // TODO not dry, copy-pasted from StatementObj::For
-                                    let param_target = self.declare_target(&target, true)?;
+                                    let param_target = self.declare_target(&target, true, &mut vec![])?;
                                     self.assign_order.push(Assign::Declare {
                                         undeclared: vec![],
                                         target,

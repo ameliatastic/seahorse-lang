@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Getters for `TokenAccount`'s mint key and `TokenMint`'s freeze authority, decimals, and supply
 
+### Fixed
+
+- Bug when assigning to variables in deeper scopes
+
 ## [0.2.5]
 
 ### Added

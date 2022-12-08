@@ -828,7 +828,15 @@ impl ToTokens for Statement {
                 let value = Grouped(value);
 
                 match target {
-                    LetTarget::Var { .. } => quote! { let #target = #value; },
+                    LetTarget::Var { .. } => {
+                        // No undeclared variables means that this statement is just an assignment
+                        if undeclared.len() == 0 {
+                            let target = target.as_immut();
+                            quote! { #target = #value; }
+                        } else {
+                            quote! { let #target = #value; }
+                        }
+                    },
                     LetTarget::Tuple(..) => {
                         let target = target.as_immut();
 
