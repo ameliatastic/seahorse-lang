@@ -63,14 +63,37 @@ impl Error {
 /// call is magic in that it disappears from the function body altogether, instead getting collected
 /// in the instruction context.
 #[derive(Clone)]
-pub struct Transformation(pub Rc<Box<dyn Fn(TypedExpression) -> Result<Transformed, CoreError>>>);
+pub struct Transformation {
+    pub function: Rc<Box<dyn Fn(TypedExpression, &Vec<ExprContext>) -> Result<Transformed, CoreError>>>,
+    pub context: Option<ExprContext>
+}
+
+#[derive(Clone, Debug)]
+pub enum ExprContext {
+    LVal,
+    Seed,
+}
 
 impl Transformation {
+    /// Default "simple" transformation that doesn't use or add context.
     pub fn new<F>(f: F) -> Self
     where
         F: Fn(TypedExpression) -> Result<Transformed, CoreError> + 'static,
     {
-        Self(Rc::new(Box::new(f)))
+        Self {
+            function: Rc::new(Box::new(|e, _| f(e))),
+            context: None
+        }
+    }
+
+    pub fn new_with_context<F>(f: F, context: Option<ExprContext>) -> Self
+    where
+        F: Fn(TypedExpression, &Vec<ExprContext>) -> Result<Transformed, CoreError> + 'static,
+    {
+        Self {
+            function: Rc::new(Box::new(f)),
+            context
+        }
     }
 }
 
@@ -517,7 +540,7 @@ impl<'a> Context<'a> {
         return Ok(statement);
     }
 
-    fn build_expression(&mut self, expression: ast::Expression) -> CResult<TypedExpression> {
+    fn build_expression(&mut self, expression: ast::Expression, context_stack: &Vec<ExprContext>) -> CResult<TypedExpression> {
         let Located(loc, obj) = expression;
         let expr_ty = self.expr_order.pop_front().unwrap();
 
@@ -775,7 +798,7 @@ impl<'a> Context<'a> {
             ty: expr_ty.clone(),
             obj,
         };
-        let expression = self.transform(expression, &loc)?;
+        let expression = self.transform(expression, &loc, context_stack)?;
 
         return Ok(expression);
     }
@@ -786,6 +809,7 @@ impl<'a> Context<'a> {
         &mut self,
         mut expression: TypedExpression,
         loc: &Location,
+        context_stack: &Vec<ExprContext>
     ) -> CResult<TypedExpression> {
         let transformation;
         (expression.ty, transformation) = match expression.ty {
@@ -795,7 +819,7 @@ impl<'a> Context<'a> {
 
         if let Some(transformation) = transformation {
             let transformed =
-                transformation.0(expression).map_err(|err| err.located(loc.clone()))?;
+                (transformation.function)(expression, context_stack).map_err(|err| err.located(loc.clone()))?;
 
             let expression = match transformed {
                 Transformed::Expression(expression) => Ok(expression),
@@ -900,7 +924,7 @@ impl<'a> Context<'a> {
             }?;
 
             // Might be multiple transformations
-            self.transform(expression, loc)
+            self.transform(expression, loc, context_stack)
         } else {
             Ok(expression)
         }
