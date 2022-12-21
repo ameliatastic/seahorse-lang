@@ -364,7 +364,7 @@ impl BuiltinSource for Python {
                         }.into();
 
                         let elem = match return_ty {
-                            Ty::Transformed(_, transformation) => match transformation.0(call)? {
+                            Ty::Transformed(_, transformation) => match (transformation.function)(call, &vec![])? {
                                 Transformed::Expression(expression) => expression,
                                 _ => {
                                     return Err(CoreError::make_raw(
@@ -419,7 +419,7 @@ impl BuiltinSource for Python {
                         }.into();
 
                         let elem = match return_ty {
-                            Ty::Transformed(_, transformation) => match transformation.0(call)? {
+                            Ty::Transformed(_, transformation) => match (transformation.function)(call, &vec![])? {
                                 Transformed::Expression(expression) => expression,
                                 _ => {
                                     return Err(CoreError::make_raw(
