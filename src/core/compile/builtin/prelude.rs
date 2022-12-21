@@ -411,6 +411,7 @@ impl BuiltinSource for Prelude {
                         ),
                         (
                             "seeds",
+                            // TODO maybe move context addition to here?
                             Ty::new_list(Ty::Cast(Ty::prelude(Self::Seed, vec![]).into())),
                             ParamType::Optional,
                         ),
@@ -447,7 +448,7 @@ impl BuiltinSource for Prelude {
                     ],
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
-                        Transformation::new(|mut expr| {
+                        Transformation::new_with_context(|mut expr, _| {
                             let (function, args) = match1!(expr.obj, ExpressionObj::Call { function, args } => (function, args));
                             let empty = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
                             let name = match1!(&empty.obj, ExpressionObj::Id(var) => var.clone());
@@ -572,7 +573,7 @@ impl BuiltinSource for Prelude {
                                 name,
                                 annotation,
                             })
-                        }),
+                        }, Some(ExprContext::Seed)),
                     ),
                 ),
             )),
