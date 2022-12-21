@@ -68,7 +68,7 @@ pub struct Transformation {
     pub context: Option<ExprContext>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExprContext {
     LVal,
     Seed,
@@ -764,7 +764,15 @@ impl<'a> Context<'a> {
                     Mutable::new(#block)
                 })
             }
-            ast::ExpressionObj::Str(s) => ExpressionObj::Literal(Literal::Str(s)),
+            ast::ExpressionObj::Str(s) => {
+                if context_stack.contains(&ExprContext::Seed) || context_stack.contains(&ExprContext::Directive) {
+                    ExpressionObj::Literal(Literal::Str(s))
+                } else {
+                    ExpressionObj::Rendered(quote! {
+                        #s.to_string()
+                    })
+                }
+            },
             ast::ExpressionObj::FStr { parts } => {
                 let mut format = String::from("");
                 let mut parts_ = vec![];
