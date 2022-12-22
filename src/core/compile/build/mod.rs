@@ -444,15 +444,29 @@ impl<'a> Context<'a> {
                 }
             }
             ast::StatementObj::OpAssign { target, op, value } => {
-                let receiver = self.build_expression(target, vec![ExprContext::LVal])?;
+                // Kind of a stupid hack to get around this problem:
+                // 
+                // OpAssigns in the Seahorse code look like "x += 1", but they
+                // look like "x = x + 1" in the generated code. We need to build
+                // x twice, once as an lval and once as not an lval, but that
+                // messes with the expression order if done naively. So as a
+                // workaround, copy the expression order and replace it Indiana
+                // Jones style before building the rval.
+                //
+                // ...this increases the (theoretical) runtime complexity
+                // substantially. Like I said, stupid.
+                let expr_order = self.expr_order.clone();
+                let receiver_lval = self.build_expression(target.clone(), vec![ExprContext::LVal])?;
+                self.expr_order = expr_order;
+                let receiver_rval = self.build_expression(target.clone(), vec![])?;
                 Statement::Assign {
-                    receiver: receiver.clone(),
+                    receiver: receiver_lval,
                     value: TypedExpression {
                         ty: Ty::Never,
                         obj: {
                             let right = self.build_expression(value, vec![])?;
 
-                            self.build_op(receiver, op, right)
+                            self.build_op(receiver_rval, op, right)
                         },
                     },
                 }
