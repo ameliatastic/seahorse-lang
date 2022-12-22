@@ -275,36 +275,6 @@ fn make_account_ty_expr(ty: Ty) -> AccountTyExpr {
     }
 }
 
-/// Turn an expression into a valid lval. Involves:
-///     1. removing any `clone`s
-///     2. descending into the data of a mutable object (attributes, indices)
-///     3. replacing the first `borrow()` with a `borrow_mut()`.
-fn make_lval(mut expression: TypedExpression) -> TypedExpression {
-    expression.obj = match expression.obj {
-        ExpressionObj::Move(value) => make_lval(*value).obj,
-        ExpressionObj::Attribute { value, name } => ExpressionObj::Attribute {
-            value: make_borrow_mut(*value).into(),
-            name,
-        },
-        ExpressionObj::Index { value, index } => ExpressionObj::Index {
-            value: make_borrow_mut(*value).into(),
-            index,
-        },
-        obj => obj,
-    };
-
-    return expression;
-}
-
-fn make_borrow_mut(mut expression: TypedExpression) -> TypedExpression {
-    expression.obj = match expression.obj {
-        ExpressionObj::BorrowImmut(value) => ExpressionObj::BorrowMut(value),
-        obj => obj,
-    };
-
-    return expression;
-}
-
 impl<'a> Context<'a> {
     fn build_func(
         &mut self,
@@ -446,7 +416,7 @@ impl<'a> Context<'a> {
                 let assign = self.assign_order.pop_front().unwrap();
                 match assign {
                     Assign::Mutate => {
-                        let receiver = make_lval(self.build_expression(target, vec![ExprContext::LVal])?);
+                        let receiver = self.build_expression(target, vec![ExprContext::LVal])?;
                         let rval = self.build_expression(value, vec![])?;
 
                         if let TypedExpression {
@@ -476,14 +446,9 @@ impl<'a> Context<'a> {
             ast::StatementObj::OpAssign { target, op, value } => {
                 let receiver = self.build_expression(target, vec![ExprContext::LVal])?;
                 Statement::Assign {
-                    receiver: make_lval(receiver.clone()),
+                    receiver: receiver.clone(),
                     value: TypedExpression {
                         ty: Ty::Never,
-                        // obj: ExpressionObj::BinOp {
-                        //     left: receiver.into(),
-                        //     op: self.build_op(op),
-                        //     right: self.build_expression(value)?.into(),
-                        // },
                         obj: {
                             let right = self.build_expression(value, vec![])?;
 
@@ -563,7 +528,11 @@ impl<'a> Context<'a> {
                     let mut value = self.build_expression(*value, context_stack.clone())?;
 
                     if value.ty.is_mut() {
-                        value.obj = ExpressionObj::BorrowImmut(value.obj.into());
+                        value.obj = if context_stack.contains(&ExprContext::LVal) {
+                            ExpressionObj::BorrowMut(value.obj.into())
+                        } else {
+                            ExpressionObj::BorrowImmut(value.obj.into())
+                        };
                     }
 
                     value
@@ -595,7 +564,11 @@ impl<'a> Context<'a> {
                             // function.
                             if let Ty::Function(..) = &expr_ty {
                             } else {
-                                value.obj = ExpressionObj::BorrowImmut(value.obj.into());
+                                value.obj = if context_stack.contains(&ExprContext::LVal) {
+                                    ExpressionObj::BorrowMut(value.obj.into())
+                                } else {
+                                    ExpressionObj::BorrowImmut(value.obj.into())
+                                };
                             }
                         }
 

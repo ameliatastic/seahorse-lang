@@ -411,7 +411,6 @@ impl BuiltinSource for Prelude {
                         ),
                         (
                             "seeds",
-                            // TODO maybe move context addition to here?
                             Ty::new_list(Ty::Cast(Ty::prelude(Self::Seed, vec![]).into())),
                             ParamType::Optional,
                         ),
