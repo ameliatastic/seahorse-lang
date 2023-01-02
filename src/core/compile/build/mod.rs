@@ -928,6 +928,10 @@ impl<'a> Context<'a> {
             // Might be multiple transformations
             self.transform(expression, loc, context_stack)
         } else {
+            if expression.ty.is_mut() && !context_stack.contains(&ExprContext::LVal) {
+                expression.obj = ExpressionObj::Move(expression.obj.into());
+            }
+
             Ok(expression)
         }
     }
