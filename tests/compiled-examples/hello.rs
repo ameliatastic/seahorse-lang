@@ -78,7 +78,7 @@ pub fn say_hello_handler<'info>(
                 to: user_acc.to_account_info(),
             },
             &[Mutable::new(vec![
-                "hello".as_bytes().as_ref(),
+                "hello".to_string().as_bytes().as_ref(),
                 bump.to_le_bytes().as_ref(),
             ])
             .borrow()

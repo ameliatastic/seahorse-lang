@@ -76,7 +76,7 @@ pub fn do_operation_handler<'info>(
     mut num: i64,
 ) -> () {
     if !(owner.key() == calculator.borrow().owner) {
-        panic!("This is not your calculator!");
+        panic!("This is not your calculator!".to_string());
     }
 
     if op == Operation::ADD {
@@ -124,12 +124,12 @@ pub fn reset_calculator_handler<'info>(
     solana_program::msg!(
         "{:?} {} {:?}",
         owner.key(),
-        "is resetting a calculator",
+        "is resetting a calculator".to_string(),
         calculator.borrow().__account__.key()
     );
 
     if !(owner.key() == calculator.borrow().owner) {
-        panic!("This is not your calculator!");
+        panic!("This is not your calculator!".to_string());
     }
 
     assign!(calculator.borrow_mut().display, 0);
