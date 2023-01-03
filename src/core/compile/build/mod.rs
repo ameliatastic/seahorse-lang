@@ -523,7 +523,6 @@ impl<'a> Context<'a> {
         let Located(loc, obj) = expression;
         let expr_ty = self.expr_order.pop_front().unwrap();
 
-        // TODO read and apply context from type
         if let Ty::Transformed(_, transformation) = &expr_ty {
             if let Some(expr_context) = &transformation.context {
                 context_stack.push(expr_context.clone());
@@ -656,14 +655,19 @@ impl<'a> Context<'a> {
             },
             ast::ExpressionObj::Int(n) => ExpressionObj::Literal(Literal::Int(n)),
             ast::ExpressionObj::Float(n) => ExpressionObj::Literal(Literal::Float(n)),
-            ast::ExpressionObj::List(list) => ExpressionObj::Mutable(
-                ExpressionObj::Vec(
+            ast::ExpressionObj::List(list) => {
+                let vec = ExpressionObj::Vec(
                     list.into_iter()
                         .map(|element| self.build_expression(element, context_stack.clone()))
                         .collect::<Result<Vec<_>, CoreError>>()?,
-                )
-                .into(),
-            ),
+                );
+
+                if !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) {
+                    ExpressionObj::Mutable(vec.into())
+                } else {
+                    vec
+                }
+            }
             ast::ExpressionObj::Tuple(tuple) => ExpressionObj::Tuple(
                 tuple
                     .into_iter()
@@ -747,9 +751,11 @@ impl<'a> Context<'a> {
                     implicit_return: Some(temp.clone().into()),
                 });
 
-                ExpressionObj::Rendered(quote! {
-                    Mutable::new(#block)
-                })
+                if !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) {
+                    ExpressionObj::Mutable(block.into())
+                } else {
+                    block
+                }
             }
             ast::ExpressionObj::Str(s) => {
                 if context_stack.contains(&ExprContext::Seed) || context_stack.contains(&ExprContext::Directive) {
@@ -928,7 +934,7 @@ impl<'a> Context<'a> {
             // Might be multiple transformations
             self.transform(expression, loc, context_stack)
         } else {
-            if expression.ty.is_mut() && !context_stack.contains(&ExprContext::LVal) {
+            if expression.ty.is_mut() && !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) && !expression.obj.is_mut_construct() {
                 expression.obj = ExpressionObj::Move(expression.obj.into());
             }
 

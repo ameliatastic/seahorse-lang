@@ -480,8 +480,6 @@ impl BuiltinSource for Prelude {
 
                             annotation.payer = Some(payer);
                             annotation.seeds = seeds.map(|seeds| {
-                                let seeds =
-                                    match1!(seeds.obj, ExpressionObj::Mutable(list) => *list);
                                 let seeds = match1!(seeds.obj, ExpressionObj::Vec(list) => list);
                                 seeds
                             });

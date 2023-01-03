@@ -391,6 +391,13 @@ impl ExpressionObj {
         }
     }
 
+    pub fn is_mut_construct(&self) -> bool {
+        match self {
+            Self::Mutable(..) => true,
+            _ => false
+        }
+    }
+
     pub fn without_borrows(self) -> Self {
         match self {
             Self::BinOp { left, op, right } => Self::BinOp {
