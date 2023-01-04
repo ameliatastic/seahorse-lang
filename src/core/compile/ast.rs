@@ -1,6 +1,13 @@
 use proc_macro2::TokenStream;
 
-use super::{super::generate::Feature, builtin::{prelude::MethodType, pyth::{ExprContext, ExprContextStack}}, check::Ty};
+use super::{
+    super::generate::Feature,
+    builtin::{
+        prelude::MethodType,
+        pyth::{ExprContext, ExprContextStack},
+    },
+    check::Ty,
+};
 use crate::core::Tree;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -405,8 +412,11 @@ impl ExpressionObj {
     /// value (attributes or indices).
     pub fn is_owned(&self) -> bool {
         match self {
-            Self::Attribute { .. } | Self::Id(..) | Self::Index { .. } | Self::TupleIndex { .. } => true,
-            _ => false
+            Self::Attribute { .. }
+            | Self::Id(..)
+            | Self::Index { .. }
+            | Self::TupleIndex { .. } => true,
+            _ => false,
         }
     }
 

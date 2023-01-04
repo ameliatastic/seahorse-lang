@@ -111,7 +111,11 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                     "  - or as a Github issue (https://github.com/ameliatastic/seahorse-lang/issues).\n\n",
                     "Thanks!"
                 ).bold();
-                return Err(error_message(format!("{} failed:\n\n{}\n\n{}", cmd, report_note, stderr)).into());
+                return Err(error_message(format!(
+                    "{} failed:\n\n{}\n\n{}",
+                    cmd, report_note, stderr
+                ))
+                .into());
             }
 
             return Ok(anchor_output.stdout);

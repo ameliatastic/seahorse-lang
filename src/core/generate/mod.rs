@@ -836,7 +836,7 @@ impl ToTokens for Statement {
                         } else {
                             quote! { let #target = #value; }
                         }
-                    },
+                    }
                     LetTarget::Tuple(..) => {
                         let target = target.as_immut();
 
@@ -1041,7 +1041,7 @@ impl ToTokens for ExpressionObj {
                 } else {
                     quote! { #value }
                 }
-            },
+            }
             Self::BorrowMut(value) => quote! { #value . borrow_mut() },
             Self::BorrowImmut(value) => quote! { #value . borrow() },
             Self::Mutable(value) => {

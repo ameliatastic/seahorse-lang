@@ -64,8 +64,9 @@ impl Error {
 /// in the instruction context.
 #[derive(Clone)]
 pub struct Transformation {
-    pub function: Rc<Box<dyn Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError>>>,
-    pub context: Option<ExprContext>
+    pub function:
+        Rc<Box<dyn Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError>>>,
+    pub context: Option<ExprContext>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -73,7 +74,7 @@ pub enum ExprContext {
     LVal,
     Seed,
     Directive,
-    Assert
+    Assert,
 }
 
 #[derive(Clone, Debug)]
@@ -121,7 +122,7 @@ impl Transformation {
     {
         Self {
             function: Rc::new(Box::new(move |e, _| f(e))),
-            context: None
+            context: None,
         }
     }
 
@@ -131,7 +132,7 @@ impl Transformation {
     {
         Self {
             function: Rc::new(Box::new(f)),
-            context
+            context,
         }
     }
 }
@@ -454,7 +455,8 @@ impl<'a> Context<'a> {
                 let assign = self.assign_order.pop_front().unwrap();
                 match assign {
                     Assign::Mutate => {
-                        let receiver = self.build_expression(target, vec![ExprContext::LVal].into())?;
+                        let receiver =
+                            self.build_expression(target, vec![ExprContext::LVal].into())?;
                         let rval = self.build_expression(value, vec![].into())?;
 
                         if let TypedExpression {
@@ -483,7 +485,7 @@ impl<'a> Context<'a> {
             }
             ast::StatementObj::OpAssign { target, op, value } => {
                 // Kind of a stupid hack to get around this problem:
-                // 
+                //
                 // OpAssigns in the Seahorse code look like "x += 1", but they
                 // look like "x = x + 1" in the generated code. We need to build
                 // x twice, once as an lval and once as not an lval, but that
@@ -494,7 +496,8 @@ impl<'a> Context<'a> {
                 // ...this increases the (theoretical) runtime complexity
                 // substantially. Like I said, stupid.
                 let expr_order = self.expr_order.clone();
-                let receiver_lval = self.build_expression(target.clone(), vec![ExprContext::LVal].into())?;
+                let receiver_lval =
+                    self.build_expression(target.clone(), vec![ExprContext::LVal].into())?;
                 self.expr_order = expr_order;
                 let receiver_rval = self.build_expression(target.clone(), vec![].into())?;
                 Statement::Assign {
@@ -557,7 +560,11 @@ impl<'a> Context<'a> {
         return Ok(statement);
     }
 
-    fn build_expression(&mut self, expression: ast::Expression, mut context_stack: ExprContextStack) -> CResult<TypedExpression> {
+    fn build_expression(
+        &mut self,
+        expression: ast::Expression,
+        mut context_stack: ExprContextStack,
+    ) -> CResult<TypedExpression> {
         let Located(loc, obj) = expression;
         let expr_ty = self.expr_order.pop_front().unwrap();
 
@@ -664,18 +671,26 @@ impl<'a> Context<'a> {
                 for arg in order.into_iter() {
                     match arg {
                         OrderedArg::Pos(pos) => {
-                            args.push(self.build_expression(pos.clone(), context_stack.clone())?.moved(&context_stack));
+                            args.push(
+                                self.build_expression(pos.clone(), context_stack.clone())?
+                                    .moved(&context_stack),
+                            );
                         }
                         OrderedArg::Var(var) => {
                             let variadic = var
                                 .into_iter()
-                                .map(|arg| self.build_expression(arg.clone(), context_stack.clone()))
+                                .map(|arg| {
+                                    self.build_expression(arg.clone(), context_stack.clone())
+                                })
                                 .collect::<Result<Vec<_>, CoreError>>()?;
 
                             args.push(ExpressionObj::Vec(variadic).into());
                         }
                         OrderedArg::Kw(Some(kw)) => {
-                            args.push(self.build_expression(kw.clone(), context_stack.clone())?.moved(&context_stack));
+                            args.push(
+                                self.build_expression(kw.clone(), context_stack.clone())?
+                                    .moved(&context_stack),
+                            );
                         }
                         OrderedArg::Kw(None) => args.push(ExpressionObj::Placeholder.into()),
                     }
@@ -696,7 +711,11 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::List(list) => {
                 let vec = ExpressionObj::Vec(
                     list.into_iter()
-                        .map(|element| Ok(self.build_expression(element, context_stack.clone())?.moved(&context_stack)))
+                        .map(|element| {
+                            Ok(self
+                                .build_expression(element, context_stack.clone())?
+                                .moved(&context_stack))
+                        })
                         .collect::<Result<Vec<_>, CoreError>>()?,
                 );
 
@@ -709,7 +728,11 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::Tuple(tuple) => ExpressionObj::Tuple(
                 tuple
                     .into_iter()
-                    .map(|element| Ok(self.build_expression(element, context_stack.clone())?.moved(&context_stack)))
+                    .map(|element| {
+                        Ok(self
+                            .build_expression(element, context_stack.clone())?
+                            .moved(&context_stack))
+                    })
                     .collect::<Result<Vec<_>, CoreError>>()?,
             ),
             ast::ExpressionObj::Comprehension { element, parts } => {
@@ -796,14 +819,18 @@ impl<'a> Context<'a> {
                 }
             }
             ast::ExpressionObj::Str(s) => {
-                if context_stack.has_any(&[ExprContext::Seed, ExprContext::Directive, ExprContext::Assert]){
+                if context_stack.has_any(&[
+                    ExprContext::Seed,
+                    ExprContext::Directive,
+                    ExprContext::Assert,
+                ]) {
                     ExpressionObj::Literal(Literal::Str(s))
                 } else {
                     ExpressionObj::Rendered(quote! {
                         #s.to_string()
                     })
                 }
-            },
+            }
             ast::ExpressionObj::FStr { parts } => {
                 let mut format = String::from("");
                 let mut parts_ = vec![];
@@ -835,7 +862,8 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::Bool(p) => ExpressionObj::Literal(Literal::Bool(p)),
             ast::ExpressionObj::None => ExpressionObj::Literal(Literal::Unit),
             ast::ExpressionObj::Iter { value } => {
-                let TypedExpression { obj, .. } = self.build_expression(*value, context_stack.clone())?;
+                let TypedExpression { obj, .. } =
+                    self.build_expression(*value, context_stack.clone())?;
                 obj
             }
         };
@@ -855,7 +883,7 @@ impl<'a> Context<'a> {
         &mut self,
         mut expression: TypedExpression,
         loc: &Location,
-        context_stack: ExprContextStack
+        context_stack: ExprContextStack,
     ) -> CResult<TypedExpression> {
         let transformation;
         (expression.ty, transformation) = match expression.ty {
@@ -864,8 +892,8 @@ impl<'a> Context<'a> {
         };
 
         if let Some(transformation) = transformation {
-            let transformed =
-                (transformation.function)(expression, &context_stack).map_err(|err| err.located(loc.clone()))?;
+            let transformed = (transformation.function)(expression, &context_stack)
+                .map_err(|err| err.located(loc.clone()))?;
 
             let expression = match transformed {
                 Transformed::Expression(expression) => Ok(expression),
