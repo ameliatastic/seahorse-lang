@@ -1033,7 +1033,15 @@ impl ToTokens for ExpressionObj {
             Self::Literal(literal) => quote! { #literal },
             Self::Block(block) => quote! { #block },
             Self::Ref(value) => quote! { (& #value) },
-            Self::Move(value) => quote! { #value . clone() },
+            Self::Move(value) => {
+                // If we're trying to move some data, we need to explicitly
+                // clone it if the type is not `Copy` and the data is owned
+                if !value.ty.is_copy() && value.obj.is_owned() {
+                    quote! { #value . clone() }
+                } else {
+                    quote! { #value }
+                }
+            },
             Self::BorrowMut(value) => quote! { #value . borrow_mut() },
             Self::BorrowImmut(value) => quote! { #value . borrow() },
             Self::Mutable(value) => {

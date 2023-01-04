@@ -626,7 +626,7 @@ impl<'a> Context<'a> {
                 for arg in order.into_iter() {
                     match arg {
                         OrderedArg::Pos(pos) => {
-                            args.push(self.build_expression(pos.clone(), context_stack.clone())?);
+                            args.push(self.build_expression(pos.clone(), context_stack.clone())?.moved(&context_stack));
                         }
                         OrderedArg::Var(var) => {
                             let variadic = var
@@ -637,7 +637,7 @@ impl<'a> Context<'a> {
                             args.push(ExpressionObj::Vec(variadic).into());
                         }
                         OrderedArg::Kw(Some(kw)) => {
-                            args.push(self.build_expression(kw.clone(), context_stack.clone())?);
+                            args.push(self.build_expression(kw.clone(), context_stack.clone())?.moved(&context_stack));
                         }
                         OrderedArg::Kw(None) => args.push(ExpressionObj::Placeholder.into()),
                     }
@@ -658,7 +658,7 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::List(list) => {
                 let vec = ExpressionObj::Vec(
                     list.into_iter()
-                        .map(|element| self.build_expression(element, context_stack.clone()))
+                        .map(|element| Ok(self.build_expression(element, context_stack.clone())?.moved(&context_stack)))
                         .collect::<Result<Vec<_>, CoreError>>()?,
                 );
 
@@ -671,7 +671,7 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::Tuple(tuple) => ExpressionObj::Tuple(
                 tuple
                     .into_iter()
-                    .map(|element| self.build_expression(element, context_stack.clone()))
+                    .map(|element| Ok(self.build_expression(element, context_stack.clone())?.moved(&context_stack)))
                     .collect::<Result<Vec<_>, CoreError>>()?,
             ),
             ast::ExpressionObj::Comprehension { element, parts } => {
@@ -934,10 +934,6 @@ impl<'a> Context<'a> {
             // Might be multiple transformations
             self.transform(expression, loc, context_stack)
         } else {
-            if expression.ty.is_mut() && !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) && !expression.obj.is_mut_construct() {
-                expression.obj = ExpressionObj::Move(expression.obj.into());
-            }
-
             Ok(expression)
         }
     }
