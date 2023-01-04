@@ -1,6 +1,13 @@
 use proc_macro2::TokenStream;
 
-use super::{super::generate::Feature, builtin::prelude::MethodType, check::Ty};
+use super::{
+    super::generate::Feature,
+    builtin::{
+        prelude::MethodType,
+        pyth::{ExprContext, ExprContextStack},
+    },
+    check::Ty,
+};
 use crate::core::Tree;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -293,6 +300,15 @@ impl TypedExpression {
         }
     }
 
+    /// Add a move to the expression, if appropriate to do so.
+    pub fn moved(mut self, context_stack: &ExprContextStack) -> Self {
+        if !context_stack.has_any(&[ExprContext::Directive, ExprContext::Seed]) {
+            self.obj = ExpressionObj::Move(self.obj.into());
+        }
+
+        return self;
+    }
+
     /// Remove the borrows from this expression.
     pub fn without_borrows(mut self) -> Self {
         self.obj = self.obj.without_borrows();
@@ -388,6 +404,19 @@ impl ExpressionObj {
             }
             .into(),
             args,
+        }
+    }
+
+    /// Return whether this expression refers to some owned data. This is true
+    /// when we're referring directly to a variable (`Id`), or some part of a
+    /// value (attributes or indices).
+    pub fn is_owned(&self) -> bool {
+        match self {
+            Self::Attribute { .. }
+            | Self::Id(..)
+            | Self::Index { .. }
+            | Self::TupleIndex { .. } => true,
+            _ => false,
         }
     }
 

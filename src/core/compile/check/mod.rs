@@ -706,11 +706,16 @@ impl<'a> Context<'a> {
     }
 
     /// Declare a target, creating a new type parameter for it.
-    /// 
+    ///
     /// Also builds a list of the variable names that get declared by this
     /// target. Declarations can happen due to the creation of a new free type,
     /// or the modification of an existing type (according to the scoping rules).
-    fn declare_target(&mut self, target: &Target, force_declare: bool, declarations: &mut Vec<String>) -> CResult<usize> {
+    fn declare_target(
+        &mut self,
+        target: &Target,
+        force_declare: bool,
+        declarations: &mut Vec<String>,
+    ) -> CResult<usize> {
         match target {
             Target::Var(var) => {
                 if !force_declare {
@@ -730,7 +735,13 @@ impl<'a> Context<'a> {
             Target::Tuple(tuple) => {
                 let params = tuple
                     .iter()
-                    .map(|target| Ok(Ty::Param(self.declare_target(target, force_declare, declarations)?)))
+                    .map(|target| {
+                        Ok(Ty::Param(self.declare_target(
+                            target,
+                            force_declare,
+                            declarations,
+                        )?))
+                    })
                     .collect::<Result<Vec<_>, CoreError>>()?;
 
                 let param = self.new_ty(Ty::python(Python::Tuple, params));
@@ -1090,9 +1101,13 @@ impl<'a> Context<'a> {
                         self.check_expr(ty.clone(), value)?;
 
                         let mut declarations = vec![];
-                        let param_target = self.declare_target(&target, false, &mut declarations)?;
+                        let param_target =
+                            self.declare_target(&target, false, &mut declarations)?;
                         // Infallible
-                        if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                        if let Assign::Declare {
+                            ref mut undeclared, ..
+                        } = self.assign_order[assign_i]
+                        {
                             *undeclared = declarations;
                         }
 
@@ -1118,7 +1133,10 @@ impl<'a> Context<'a> {
                     let mut declarations = vec![];
                     let param_target = self.declare_target(&target, false, &mut declarations)?;
                     // Infallible
-                    if let Assign::Declare { ref mut undeclared, .. } = self.assign_order[assign_i] {
+                    if let Assign::Declare {
+                        ref mut undeclared, ..
+                    } = self.assign_order[assign_i]
+                    {
                         *undeclared = declarations;
                     }
 
@@ -1363,7 +1381,8 @@ impl<'a> Context<'a> {
                             match as_assignment_target(target) {
                                 Some(target) => {
                                     // TODO not dry, copy-pasted from StatementObj::For
-                                    let param_target = self.declare_target(&target, true, &mut vec![])?;
+                                    let param_target =
+                                        self.declare_target(&target, true, &mut vec![])?;
                                     self.assign_order.push(Assign::Declare {
                                         undeclared: vec![],
                                         target,

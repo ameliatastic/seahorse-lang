@@ -63,14 +63,77 @@ impl Error {
 /// call is magic in that it disappears from the function body altogether, instead getting collected
 /// in the instruction context.
 #[derive(Clone)]
-pub struct Transformation(pub Rc<Box<dyn Fn(TypedExpression) -> Result<Transformed, CoreError>>>);
+pub struct Transformation {
+    pub function:
+        Rc<Box<dyn Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError>>>,
+    pub context: Option<ExprContext>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ExprContext {
+    LVal,
+    Seed,
+    Directive,
+    Assert,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprContextStack(Vec<ExprContext>);
+
+impl ExprContextStack {
+    /// Test if the stack has the given context.
+    pub fn has(&self, context: &ExprContext) -> bool {
+        self.0.contains(context)
+    }
+
+    /// Test if the top of the stack is the given context.
+    pub fn has_top(&self, context: &ExprContext) -> bool {
+        self.0.last() == Some(context)
+    }
+
+    /// Test if the stack has any of the given contexts.
+    pub fn has_any(&self, contexts: &[ExprContext]) -> bool {
+        contexts.iter().any(|context| self.0.contains(context))
+    }
+
+    pub fn with(&self, context: ExprContext) -> Self {
+        let mut new = self.clone();
+        new.0.push(context);
+
+        return new;
+    }
+
+    pub fn push(&mut self, context: ExprContext) {
+        self.0.push(context);
+    }
+}
+
+impl From<Vec<ExprContext>> for ExprContextStack {
+    fn from(stack: Vec<ExprContext>) -> Self {
+        Self(stack)
+    }
+}
 
 impl Transformation {
+    /// Default "simple" transformation that doesn't use or add context.
     pub fn new<F>(f: F) -> Self
     where
         F: Fn(TypedExpression) -> Result<Transformed, CoreError> + 'static,
     {
-        Self(Rc::new(Box::new(f)))
+        Self {
+            function: Rc::new(Box::new(move |e, _| f(e))),
+            context: None,
+        }
+    }
+
+    pub fn new_with_context<F>(f: F, context: Option<ExprContext>) -> Self
+    where
+        F: Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError> + 'static,
+    {
+        Self {
+            function: Rc::new(Box::new(f)),
+            context,
+        }
     }
 }
 
@@ -251,36 +314,6 @@ fn make_account_ty_expr(ty: Ty) -> AccountTyExpr {
     }
 }
 
-/// Turn an expression into a valid lval. Involves:
-///     1. removing any `clone`s
-///     2. descending into the data of a mutable object (attributes, indices)
-///     3. replacing the first `borrow()` with a `borrow_mut()`.
-fn make_lval(mut expression: TypedExpression) -> TypedExpression {
-    expression.obj = match expression.obj {
-        ExpressionObj::Move(value) => make_lval(*value).obj,
-        ExpressionObj::Attribute { value, name } => ExpressionObj::Attribute {
-            value: make_borrow_mut(*value).into(),
-            name,
-        },
-        ExpressionObj::Index { value, index } => ExpressionObj::Index {
-            value: make_borrow_mut(*value).into(),
-            index,
-        },
-        obj => obj,
-    };
-
-    return expression;
-}
-
-fn make_borrow_mut(mut expression: TypedExpression) -> TypedExpression {
-    expression.obj = match expression.obj {
-        ExpressionObj::BorrowImmut(value) => ExpressionObj::BorrowMut(value),
-        obj => obj,
-    };
-
-    return expression;
-}
-
 impl<'a> Context<'a> {
     fn build_func(
         &mut self,
@@ -408,22 +441,23 @@ impl<'a> Context<'a> {
             ast::StatementObj::Continue => Statement::Continue,
             ast::StatementObj::Return { value } => {
                 let value = value
-                    .map(|value| self.build_expression(value))
+                    .map(|value| self.build_expression(value, vec![].into()))
                     .transpose()?;
 
                 Statement::Return(value)
             }
             ast::StatementObj::Pass => Statement::Noop,
             ast::StatementObj::Assert { test, msg } => Statement::AnchorRequire {
-                cond: self.build_expression(test)?,
-                msg: self.build_expression(msg.unwrap())?,
+                cond: self.build_expression(test, vec![].into())?,
+                msg: self.build_expression(msg.unwrap(), vec![ExprContext::Assert].into())?,
             },
             ast::StatementObj::Assign { target, value } => {
                 let assign = self.assign_order.pop_front().unwrap();
                 match assign {
                     Assign::Mutate => {
-                        let receiver = make_lval(self.build_expression(target)?);
-                        let rval = self.build_expression(value)?;
+                        let receiver =
+                            self.build_expression(target, vec![ExprContext::LVal].into())?;
+                        let rval = self.build_expression(value, vec![].into())?;
 
                         if let TypedExpression {
                             obj: ExpressionObj::Index { value, index },
@@ -445,26 +479,35 @@ impl<'a> Context<'a> {
                     Assign::Declare { undeclared, target } => Statement::Let {
                         undeclared,
                         target: self.build_target(target),
-                        value: self.build_expression(value)?,
+                        value: self.build_expression(value, vec![].into())?,
                     },
-                    _ => panic!(),
                 }
             }
             ast::StatementObj::OpAssign { target, op, value } => {
-                let receiver = self.build_expression(target)?;
+                // Kind of a stupid hack to get around this problem:
+                //
+                // OpAssigns in the Seahorse code look like "x += 1", but they
+                // look like "x = x + 1" in the generated code. We need to build
+                // x twice, once as an lval and once as not an lval, but that
+                // messes with the expression order if done naively. So as a
+                // workaround, copy the expression order and replace it Indiana
+                // Jones style before building the rval.
+                //
+                // ...this increases the (theoretical) runtime complexity
+                // substantially. Like I said, stupid.
+                let expr_order = self.expr_order.clone();
+                let receiver_lval =
+                    self.build_expression(target.clone(), vec![ExprContext::LVal].into())?;
+                self.expr_order = expr_order;
+                let receiver_rval = self.build_expression(target.clone(), vec![].into())?;
                 Statement::Assign {
-                    receiver: make_lval(receiver.clone()),
+                    receiver: receiver_lval,
                     value: TypedExpression {
                         ty: Ty::Never,
-                        // obj: ExpressionObj::BinOp {
-                        //     left: receiver.into(),
-                        //     op: self.build_op(op),
-                        //     right: self.build_expression(value)?.into(),
-                        // },
                         obj: {
-                            let right = self.build_expression(value)?;
+                            let right = self.build_expression(value, vec![].into())?;
 
-                            self.build_op(receiver, op, right)
+                            self.build_op(receiver_rval, op, right)
                         },
                     },
                 }
@@ -480,21 +523,21 @@ impl<'a> Context<'a> {
                         // TODO
                         undeclared,
                         target: self.build_target(target),
-                        value: self.build_expression(value)?,
+                        value: self.build_expression(value, vec![].into())?,
                     },
                     None => panic!(),
                 }
             }
             ast::StatementObj::ExpressionObj { expression } => {
-                Statement::Expression(self.build_expression(expression)?)
+                Statement::Expression(self.build_expression(expression, vec![].into())?)
             }
             ast::StatementObj::If { test, body, orelse } => Statement::If {
-                cond: self.build_expression(test)?,
+                cond: self.build_expression(test, vec![].into())?,
                 body: self.build_block(body)?,
                 orelse: orelse.map(|block| self.build_block(block)).transpose()?,
             },
             ast::StatementObj::While { test, body } => Statement::While {
-                cond: self.build_expression(test)?,
+                cond: self.build_expression(test, vec![].into())?,
                 body: self.build_block(body)?,
             },
             ast::StatementObj::For {
@@ -506,7 +549,7 @@ impl<'a> Context<'a> {
                 match assign {
                     Assign::Declare { target, .. } => Statement::For {
                         target: self.build_target(target),
-                        iter: self.build_expression(iter)?,
+                        iter: self.build_expression(iter, vec![].into())?,
                         body: self.build_block(body)?,
                     },
                     _ => panic!(),
@@ -517,29 +560,43 @@ impl<'a> Context<'a> {
         return Ok(statement);
     }
 
-    fn build_expression(&mut self, expression: ast::Expression) -> CResult<TypedExpression> {
+    fn build_expression(
+        &mut self,
+        expression: ast::Expression,
+        mut context_stack: ExprContextStack,
+    ) -> CResult<TypedExpression> {
         let Located(loc, obj) = expression;
         let expr_ty = self.expr_order.pop_front().unwrap();
 
+        if let Ty::Transformed(_, transformation) = &expr_ty {
+            if let Some(expr_context) = &transformation.context {
+                context_stack.push(expr_context.clone());
+            }
+        }
+
         let obj = match obj {
             ast::ExpressionObj::BinOp { left, op, right } => {
-                let left = self.build_expression(*left)?;
-                let right = self.build_expression(*right)?;
+                let left = self.build_expression(*left, context_stack.clone())?;
+                let right = self.build_expression(*right, context_stack.clone())?;
 
                 self.build_op(left, op, right)
             }
             ast::ExpressionObj::Index { value, index } => ExpressionObj::Index {
                 value: {
-                    let mut value = self.build_expression(*value)?;
+                    let mut value = self.build_expression(*value, context_stack.clone())?;
 
                     if value.ty.is_mut() {
-                        value.obj = ExpressionObj::BorrowImmut(value.obj.into());
+                        value.obj = if context_stack.has(&ExprContext::LVal) {
+                            ExpressionObj::BorrowMut(value.obj.into())
+                        } else {
+                            ExpressionObj::BorrowImmut(value.obj.into())
+                        };
                     }
 
                     value
                 }
                 .into(),
-                index: self.build_expression(*index)?.into(),
+                index: self.build_expression(*index, context_stack.clone())?.into(),
             },
             ast::ExpressionObj::UnOp { op, value } => ExpressionObj::UnOp {
                 op: match op {
@@ -548,10 +605,10 @@ impl<'a> Context<'a> {
                     ast::UnaryOperator::Not => UnaryOperator::Not,
                     ast::UnaryOperator::Inv => UnaryOperator::Inv,
                 },
-                value: self.build_expression(*value)?.into(),
+                value: self.build_expression(*value, context_stack.clone())?.into(),
             },
             ast::ExpressionObj::Attribute { value, name } => {
-                let mut value = self.build_expression(*value)?;
+                let mut value = self.build_expression(*value, context_stack.clone())?;
 
                 match &value.ty {
                     Ty::Type(..) | Ty::Path(..) => ExpressionObj::StaticAttribute {
@@ -565,7 +622,11 @@ impl<'a> Context<'a> {
                             // function.
                             if let Ty::Function(..) = &expr_ty {
                             } else {
-                                value.obj = ExpressionObj::BorrowImmut(value.obj.into());
+                                value.obj = if context_stack.has(&ExprContext::LVal) {
+                                    ExpressionObj::BorrowMut(value.obj.into())
+                                } else {
+                                    ExpressionObj::BorrowImmut(value.obj.into())
+                                };
                             }
                         }
 
@@ -593,7 +654,7 @@ impl<'a> Context<'a> {
                     )],
                 );
 
-                let function = self.build_expression(*function)?;
+                let function = self.build_expression(*function, context_stack.clone())?;
                 let params = match &function.ty {
                     Ty::Function(params, ..) => params,
                     Ty::Type(_, Some(constructor)) => match &**constructor {
@@ -610,18 +671,26 @@ impl<'a> Context<'a> {
                 for arg in order.into_iter() {
                     match arg {
                         OrderedArg::Pos(pos) => {
-                            args.push(self.build_expression(pos.clone())?);
+                            args.push(
+                                self.build_expression(pos.clone(), context_stack.clone())?
+                                    .moved(&context_stack),
+                            );
                         }
                         OrderedArg::Var(var) => {
                             let variadic = var
                                 .into_iter()
-                                .map(|arg| self.build_expression(arg.clone()))
+                                .map(|arg| {
+                                    self.build_expression(arg.clone(), context_stack.clone())
+                                })
                                 .collect::<Result<Vec<_>, CoreError>>()?;
 
                             args.push(ExpressionObj::Vec(variadic).into());
                         }
                         OrderedArg::Kw(Some(kw)) => {
-                            args.push(self.build_expression(kw.clone())?);
+                            args.push(
+                                self.build_expression(kw.clone(), context_stack.clone())?
+                                    .moved(&context_stack),
+                            );
                         }
                         OrderedArg::Kw(None) => args.push(ExpressionObj::Placeholder.into()),
                     }
@@ -633,24 +702,37 @@ impl<'a> Context<'a> {
                 }
             }
             ast::ExpressionObj::Ternary { test, body, orelse } => ExpressionObj::Ternary {
-                cond: Box::new(self.build_expression(*test)?),
-                body: Box::new(self.build_expression(*body)?),
-                orelse: Box::new(self.build_expression(*orelse)?),
+                cond: Box::new(self.build_expression(*test, context_stack.clone())?),
+                body: Box::new(self.build_expression(*body, context_stack.clone())?),
+                orelse: Box::new(self.build_expression(*orelse, context_stack.clone())?),
             },
             ast::ExpressionObj::Int(n) => ExpressionObj::Literal(Literal::Int(n)),
             ast::ExpressionObj::Float(n) => ExpressionObj::Literal(Literal::Float(n)),
-            ast::ExpressionObj::List(list) => ExpressionObj::Mutable(
-                ExpressionObj::Vec(
+            ast::ExpressionObj::List(list) => {
+                let vec = ExpressionObj::Vec(
                     list.into_iter()
-                        .map(|element| self.build_expression(element))
+                        .map(|element| {
+                            Ok(self
+                                .build_expression(element, context_stack.clone())?
+                                .moved(&context_stack))
+                        })
                         .collect::<Result<Vec<_>, CoreError>>()?,
-                )
-                .into(),
-            ),
+                );
+
+                if !context_stack.has_any(&[ExprContext::LVal, ExprContext::Seed]) {
+                    ExpressionObj::Mutable(vec.into())
+                } else {
+                    vec
+                }
+            }
             ast::ExpressionObj::Tuple(tuple) => ExpressionObj::Tuple(
                 tuple
                     .into_iter()
-                    .map(|element| self.build_expression(element))
+                    .map(|element| {
+                        Ok(self
+                            .build_expression(element, context_stack.clone())?
+                            .moved(&context_stack))
+                    })
                     .collect::<Result<Vec<_>, CoreError>>()?,
             ),
             ast::ExpressionObj::Comprehension { element, parts } => {
@@ -662,7 +744,7 @@ impl<'a> Context<'a> {
                             Ok(match assign {
                                 Assign::Declare { target, .. } => Statement::For {
                                     target: self.build_target(target),
-                                    iter: self.build_expression(iter)?,
+                                    iter: self.build_expression(iter, context_stack.clone())?,
                                     body: Block {
                                         body: vec![],
                                         implicit_return: None,
@@ -672,7 +754,7 @@ impl<'a> Context<'a> {
                             })
                         }
                         ComprehensionPart::If { cond } => Ok(Statement::If {
-                            cond: self.build_expression(cond)?,
+                            cond: self.build_expression(cond, context_stack.clone())?,
                             body: Block {
                                 body: vec![],
                                 implicit_return: None,
@@ -682,7 +764,7 @@ impl<'a> Context<'a> {
                     })
                     .collect::<Result<Vec<_>, CoreError>>()?;
 
-                let element = self.build_expression(*element)?;
+                let element = self.build_expression(*element, context_stack.clone())?;
 
                 let temp: TypedExpression = ExpressionObj::Id("temp".to_string()).into();
 
@@ -730,11 +812,25 @@ impl<'a> Context<'a> {
                     implicit_return: Some(temp.clone().into()),
                 });
 
-                ExpressionObj::Rendered(quote! {
-                    Mutable::new(#block)
-                })
+                if !context_stack.has_any(&[ExprContext::LVal, ExprContext::Seed]) {
+                    ExpressionObj::Mutable(block.into())
+                } else {
+                    block
+                }
             }
-            ast::ExpressionObj::Str(s) => ExpressionObj::Literal(Literal::Str(s)),
+            ast::ExpressionObj::Str(s) => {
+                if context_stack.has_any(&[
+                    ExprContext::Seed,
+                    ExprContext::Directive,
+                    ExprContext::Assert,
+                ]) {
+                    ExpressionObj::Literal(Literal::Str(s))
+                } else {
+                    ExpressionObj::Rendered(quote! {
+                        #s.to_string()
+                    })
+                }
+            }
             ast::ExpressionObj::FStr { parts } => {
                 let mut format = String::from("");
                 let mut parts_ = vec![];
@@ -742,7 +838,7 @@ impl<'a> Context<'a> {
                 for part in parts.into_iter() {
                     match part {
                         ast::FStrPart::ExpressionObj(expr) => {
-                            let part = self.build_expression(expr)?;
+                            let part = self.build_expression(expr, context_stack.clone())?;
 
                             if part.ty.is_display() {
                                 format.push_str("{}");
@@ -766,7 +862,8 @@ impl<'a> Context<'a> {
             ast::ExpressionObj::Bool(p) => ExpressionObj::Literal(Literal::Bool(p)),
             ast::ExpressionObj::None => ExpressionObj::Literal(Literal::Unit),
             ast::ExpressionObj::Iter { value } => {
-                let TypedExpression { obj, .. } = self.build_expression(*value)?;
+                let TypedExpression { obj, .. } =
+                    self.build_expression(*value, context_stack.clone())?;
                 obj
             }
         };
@@ -775,7 +872,7 @@ impl<'a> Context<'a> {
             ty: expr_ty.clone(),
             obj,
         };
-        let expression = self.transform(expression, &loc)?;
+        let expression = self.transform(expression, &loc, context_stack)?;
 
         return Ok(expression);
     }
@@ -786,6 +883,7 @@ impl<'a> Context<'a> {
         &mut self,
         mut expression: TypedExpression,
         loc: &Location,
+        context_stack: ExprContextStack,
     ) -> CResult<TypedExpression> {
         let transformation;
         (expression.ty, transformation) = match expression.ty {
@@ -794,8 +892,8 @@ impl<'a> Context<'a> {
         };
 
         if let Some(transformation) = transformation {
-            let transformed =
-                transformation.0(expression).map_err(|err| err.located(loc.clone()))?;
+            let transformed = (transformation.function)(expression, &context_stack)
+                .map_err(|err| err.located(loc.clone()))?;
 
             let expression = match transformed {
                 Transformed::Expression(expression) => Ok(expression),
@@ -900,7 +998,7 @@ impl<'a> Context<'a> {
             }?;
 
             // Might be multiple transformations
-            self.transform(expression, loc)
+            self.transform(expression, loc, context_stack)
         } else {
             Ok(expression)
         }
@@ -1151,7 +1249,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     };
 
                     let loc = expression.0.clone();
-                    context.build_expression(expression)?;
+                    context.build_expression(expression, vec![ExprContext::Directive].into())?;
 
                     if let Some(mut directives) = context.directives.take() {
                         artifact.directives.append(&mut directives);

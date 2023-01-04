@@ -124,7 +124,7 @@ pub fn reset_calculator_handler<'info>(
     solana_program::msg!(
         "{:?} {} {:?}",
         owner.key(),
-        "is resetting a calculator",
+        "is resetting a calculator".to_string(),
         calculator.borrow().__account__.key()
     );
 

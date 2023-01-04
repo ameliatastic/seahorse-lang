@@ -447,132 +447,137 @@ impl BuiltinSource for Prelude {
                     ],
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
-                        Transformation::new(|mut expr| {
-                            let (function, args) = match1!(expr.obj, ExpressionObj::Call { function, args } => (function, args));
-                            let empty = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
-                            let name = match1!(&empty.obj, ExpressionObj::Id(var) => var.clone());
-                            let mut args = args.into_iter();
+                        Transformation::new_with_context(
+                            |mut expr, _| {
+                                let (function, args) = match1!(expr.obj, ExpressionObj::Call { function, args } => (function, args));
+                                let empty = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+                                let name =
+                                    match1!(&empty.obj, ExpressionObj::Id(var) => var.clone());
+                                let mut args = args.into_iter();
 
-                            let mut annotation = AccountAnnotation::new();
-                            annotation.is_mut = false;
-                            annotation.init = true;
+                                let mut annotation = AccountAnnotation::new();
+                                annotation.is_mut = false;
+                                annotation.init = true;
 
-                            let payer = args.next().unwrap();
-                            let seeds = args.next().unwrap().optional();
+                                let payer = args.next().unwrap();
+                                let seeds = args.next().unwrap().optional();
 
-                            let mint = args.next().unwrap().optional();
-                            let authority = args.next().unwrap().optional();
-                            let decimals = args.next().unwrap().optional();
-                            let associated = match args.next().unwrap().obj {
-                                ExpressionObj::Literal(Literal::Bool(associated)) => {
-                                    Some(associated)
-                                }
-                                ExpressionObj::Placeholder => None,
-                                _ => {
-                                    return Err(CoreError::make_raw(
+                                let mint = args.next().unwrap().optional();
+                                let authority = args.next().unwrap().optional();
+                                let decimals = args.next().unwrap().optional();
+                                let associated = match args.next().unwrap().obj {
+                                    ExpressionObj::Literal(Literal::Bool(associated)) => {
+                                        Some(associated)
+                                    }
+                                    ExpressionObj::Placeholder => None,
+                                    _ => {
+                                        return Err(CoreError::make_raw(
                                         "invalid argument to Empty.init()",
                                         "Hint: if you provide a value for \"associated\", it must be a boolean literal."
                                     ));
-                                }
-                            };
-                            let space = args.next().unwrap().optional();
-                            let padding = args.next().unwrap().optional();
+                                    }
+                                };
+                                let space = args.next().unwrap().optional();
+                                let padding = args.next().unwrap().optional();
 
-                            annotation.payer = Some(payer);
-                            annotation.seeds = seeds.map(|seeds| {
-                                let seeds =
-                                    match1!(seeds.obj, ExpressionObj::Mutable(list) => *list);
-                                let seeds = match1!(seeds.obj, ExpressionObj::Vec(list) => list);
-                                seeds
-                            });
+                                annotation.payer = Some(payer);
+                                annotation.seeds = seeds.map(|seeds| {
+                                    let seeds =
+                                        match1!(seeds.obj, ExpressionObj::Vec(list) => list);
+                                    seeds
+                                });
 
-                            match &expr.ty {
-                                Ty::Generic(name, _) => match name {
-                                    TyName::Defined(_, DefinedType::Account) => {
-                                        if mint.is_some()
-                                            || authority.is_some()
-                                            || decimals.is_some()
-                                            || associated.is_some()
-                                        {
-                                            return Err(CoreError::make_raw(
+                                match &expr.ty {
+                                    Ty::Generic(name, _) => match name {
+                                        TyName::Defined(_, DefinedType::Account) => {
+                                            if mint.is_some()
+                                                || authority.is_some()
+                                                || decimals.is_some()
+                                                || associated.is_some()
+                                            {
+                                                return Err(CoreError::make_raw(
                                                 "invalid argument to Empty.init() for a program account",
                                                 "Hint: you can only pass in a payer and optionally a list of seeds."
                                             ));
-                                        }
+                                            }
 
-                                        if space.is_some() && padding.is_some() {
-                                            return Err(CoreError::make_raw(
+                                            if space.is_some() && padding.is_some() {
+                                                return Err(CoreError::make_raw(
                                                 "invalid argument to Empty.init() for a program account",
                                                 "Hint: you can only pass one of space and padding",
                                             ));
+                                            }
+
+                                            annotation.space = space;
+                                            annotation.padding = padding;
                                         }
 
-                                        annotation.space = space;
-                                        annotation.padding = padding;
-                                    }
-
-                                    TyName::Builtin(Builtin::Prelude(Self::TokenMint)) => {
-                                        if mint.is_some()
-                                            || authority.is_none()
-                                            || decimals.is_none()
-                                            || associated.is_some()
-                                            || space.is_some()
-                                        {
-                                            return Err(CoreError::make_raw(
+                                        TyName::Builtin(Builtin::Prelude(Self::TokenMint)) => {
+                                            if mint.is_some()
+                                                || authority.is_none()
+                                                || decimals.is_none()
+                                                || associated.is_some()
+                                                || space.is_some()
+                                            {
+                                                return Err(CoreError::make_raw(
                                                 "invalid argument to Empty[TokenMint].init()",
                                                 "Hint: you can only pass in a payer, an authority, a number of decimals, and optionally a list of seeds."
                                             ));
-                                        }
+                                            }
 
-                                        annotation.mint_authority = authority;
-                                        annotation.mint_decimals = decimals;
-                                    }
-                                    TyName::Builtin(Builtin::Prelude(Self::TokenAccount)) => {
-                                        if mint.is_none()
-                                            || authority.is_none()
-                                            || decimals.is_some()
-                                            || space.is_some()
-                                        {
-                                            return Err(CoreError::make_raw(
+                                            annotation.mint_authority = authority;
+                                            annotation.mint_decimals = decimals;
+                                        }
+                                        TyName::Builtin(Builtin::Prelude(Self::TokenAccount)) => {
+                                            if mint.is_none()
+                                                || authority.is_none()
+                                                || decimals.is_some()
+                                                || space.is_some()
+                                            {
+                                                return Err(CoreError::make_raw(
                                                 "invalid argument to Empty[TokenAccount].init()",
                                                 "Hint: you can only pass in a payer, an authority, a mint, and optionally a list of seeds."
                                             ));
-                                        }
+                                            }
 
-                                        if annotation.seeds.is_some() && associated == Some(true) {
-                                            return Err(CoreError::make_raw(
+                                            if annotation.seeds.is_some()
+                                                && associated == Some(true)
+                                            {
+                                                return Err(CoreError::make_raw(
                                                 "invalid argument to Empty[TokenAccount].init()",
                                                 "Hint: you may not initialize an associated token account with seeds."
                                             ));
-                                        }
+                                            }
 
-                                        annotation.token_authority = authority;
-                                        annotation.token_mint = mint;
+                                            annotation.token_authority = authority;
+                                            annotation.token_mint = mint;
 
-                                        if associated == Some(true) {
-                                            annotation.is_associated = true;
+                                            if associated == Some(true) {
+                                                annotation.is_associated = true;
+                                            }
                                         }
-                                    }
-                                    _ => {
-                                        return Err(CoreError::make_raw(
+                                        _ => {
+                                            return Err(CoreError::make_raw(
                                             format!("could not initialize account type \"{}\"", expr.ty),
                                             "Help: you can only initialize program accounts (owned by your program), SPL token mints, and SPL token accounts."
                                         ));
-                                    }
-                                },
-                                _ => panic!(),
-                            }
+                                        }
+                                    },
+                                    _ => panic!(),
+                                }
 
-                            expr.obj = ExpressionObj::Rendered(quote! {
-                                #empty.account.clone()
-                            });
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    #empty.account.clone()
+                                });
 
-                            Ok(Transformed::AccountInit {
-                                expr,
-                                name,
-                                annotation,
-                            })
-                        }),
+                                Ok(Transformed::AccountInit {
+                                    expr,
+                                    name,
+                                    annotation,
+                                })
+                            },
+                            Some(ExprContext::Seed),
+                        ),
                     ),
                 ),
             )),
