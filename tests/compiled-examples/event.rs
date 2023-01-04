@@ -45,7 +45,7 @@ pub fn send_event_handler<'info>(
     mut data: u8,
     mut title: String,
 ) -> () {
-    let mut event = HelloEvent::__new__(data, title, sender.key());
+    let mut event = HelloEvent::__new__(data.clone(), title.clone(), sender.key());
 
     event.__emit__();
 }

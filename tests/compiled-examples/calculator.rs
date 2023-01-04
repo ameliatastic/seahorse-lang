@@ -76,7 +76,7 @@ pub fn do_operation_handler<'info>(
     mut num: i64,
 ) -> () {
     if !(owner.key() == calculator.borrow().owner) {
-        panic!("This is not your calculator!".to_string());
+        panic!("This is not your calculator!");
     }
 
     if op == Operation::ADD {
@@ -129,7 +129,7 @@ pub fn reset_calculator_handler<'info>(
     );
 
     if !(owner.key() == calculator.borrow().owner) {
-        panic!("This is not your calculator!".to_string());
+        panic!("This is not your calculator!");
     }
 
     assign!(calculator.borrow_mut().display, 0);

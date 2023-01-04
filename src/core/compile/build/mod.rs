@@ -72,7 +72,8 @@ pub struct Transformation {
 pub enum ExprContext {
     LVal,
     Seed,
-    Directive
+    Directive,
+    Assert
 }
 
 impl Transformation {
@@ -410,7 +411,7 @@ impl<'a> Context<'a> {
             ast::StatementObj::Pass => Statement::Noop,
             ast::StatementObj::Assert { test, msg } => Statement::AnchorRequire {
                 cond: self.build_expression(test, vec![])?,
-                msg: self.build_expression(msg.unwrap(), vec![])?,
+                msg: self.build_expression(msg.unwrap(), vec![ExprContext::Assert])?,
             },
             ast::StatementObj::Assign { target, value } => {
                 let assign = self.assign_order.pop_front().unwrap();
@@ -758,7 +759,7 @@ impl<'a> Context<'a> {
                 }
             }
             ast::ExpressionObj::Str(s) => {
-                if context_stack.contains(&ExprContext::Seed) || context_stack.contains(&ExprContext::Directive) {
+                if context_stack.contains(&ExprContext::Seed) || context_stack.contains(&ExprContext::Directive)  || context_stack.contains(&ExprContext::Assert){
                     ExpressionObj::Literal(Literal::Str(s))
                 } else {
                     ExpressionObj::Rendered(quote! {
