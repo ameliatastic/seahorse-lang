@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Bug when assigning to variables in deeper scopes
+- Bug that caused strings to not be converted to owned types in generate code
+- Bug that kept clones from appearing in generated code, leading to borrow checker errors
 
 ## [0.2.5]
 
