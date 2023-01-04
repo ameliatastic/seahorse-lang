@@ -64,7 +64,7 @@ impl Error {
 /// in the instruction context.
 #[derive(Clone)]
 pub struct Transformation {
-    pub function: Rc<Box<dyn Fn(TypedExpression, &Vec<ExprContext>) -> Result<Transformed, CoreError>>>,
+    pub function: Rc<Box<dyn Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError>>>,
     pub context: Option<ExprContext>
 }
 
@@ -74,6 +74,43 @@ pub enum ExprContext {
     Seed,
     Directive,
     Assert
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprContextStack(Vec<ExprContext>);
+
+impl ExprContextStack {
+    /// Test if the stack has the given context.
+    pub fn has(&self, context: &ExprContext) -> bool {
+        self.0.contains(context)
+    }
+
+    /// Test if the top of the stack is the given context.
+    pub fn has_top(&self, context: &ExprContext) -> bool {
+        self.0.last() == Some(context)
+    }
+
+    /// Test if the stack has any of the given contexts.
+    pub fn has_any(&self, contexts: &[ExprContext]) -> bool {
+        contexts.iter().any(|context| self.0.contains(context))
+    }
+
+    pub fn with(&self, context: ExprContext) -> Self {
+        let mut new = self.clone();
+        new.0.push(context);
+
+        return new;
+    }
+
+    pub fn push(&mut self, context: ExprContext) {
+        self.0.push(context);
+    }
+}
+
+impl From<Vec<ExprContext>> for ExprContextStack {
+    fn from(stack: Vec<ExprContext>) -> Self {
+        Self(stack)
+    }
 }
 
 impl Transformation {
@@ -90,7 +127,7 @@ impl Transformation {
 
     pub fn new_with_context<F>(f: F, context: Option<ExprContext>) -> Self
     where
-        F: Fn(TypedExpression, &Vec<ExprContext>) -> Result<Transformed, CoreError> + 'static,
+        F: Fn(TypedExpression, &ExprContextStack) -> Result<Transformed, CoreError> + 'static,
     {
         Self {
             function: Rc::new(Box::new(f)),
@@ -403,22 +440,22 @@ impl<'a> Context<'a> {
             ast::StatementObj::Continue => Statement::Continue,
             ast::StatementObj::Return { value } => {
                 let value = value
-                    .map(|value| self.build_expression(value, vec![]))
+                    .map(|value| self.build_expression(value, vec![].into()))
                     .transpose()?;
 
                 Statement::Return(value)
             }
             ast::StatementObj::Pass => Statement::Noop,
             ast::StatementObj::Assert { test, msg } => Statement::AnchorRequire {
-                cond: self.build_expression(test, vec![])?,
-                msg: self.build_expression(msg.unwrap(), vec![ExprContext::Assert])?,
+                cond: self.build_expression(test, vec![].into())?,
+                msg: self.build_expression(msg.unwrap(), vec![ExprContext::Assert].into())?,
             },
             ast::StatementObj::Assign { target, value } => {
                 let assign = self.assign_order.pop_front().unwrap();
                 match assign {
                     Assign::Mutate => {
-                        let receiver = self.build_expression(target, vec![ExprContext::LVal])?;
-                        let rval = self.build_expression(value, vec![])?;
+                        let receiver = self.build_expression(target, vec![ExprContext::LVal].into())?;
+                        let rval = self.build_expression(value, vec![].into())?;
 
                         if let TypedExpression {
                             obj: ExpressionObj::Index { value, index },
@@ -440,7 +477,7 @@ impl<'a> Context<'a> {
                     Assign::Declare { undeclared, target } => Statement::Let {
                         undeclared,
                         target: self.build_target(target),
-                        value: self.build_expression(value, vec![])?,
+                        value: self.build_expression(value, vec![].into())?,
                     },
                 }
             }
@@ -457,15 +494,15 @@ impl<'a> Context<'a> {
                 // ...this increases the (theoretical) runtime complexity
                 // substantially. Like I said, stupid.
                 let expr_order = self.expr_order.clone();
-                let receiver_lval = self.build_expression(target.clone(), vec![ExprContext::LVal])?;
+                let receiver_lval = self.build_expression(target.clone(), vec![ExprContext::LVal].into())?;
                 self.expr_order = expr_order;
-                let receiver_rval = self.build_expression(target.clone(), vec![])?;
+                let receiver_rval = self.build_expression(target.clone(), vec![].into())?;
                 Statement::Assign {
                     receiver: receiver_lval,
                     value: TypedExpression {
                         ty: Ty::Never,
                         obj: {
-                            let right = self.build_expression(value, vec![])?;
+                            let right = self.build_expression(value, vec![].into())?;
 
                             self.build_op(receiver_rval, op, right)
                         },
@@ -483,21 +520,21 @@ impl<'a> Context<'a> {
                         // TODO
                         undeclared,
                         target: self.build_target(target),
-                        value: self.build_expression(value, vec![])?,
+                        value: self.build_expression(value, vec![].into())?,
                     },
                     None => panic!(),
                 }
             }
             ast::StatementObj::ExpressionObj { expression } => {
-                Statement::Expression(self.build_expression(expression, vec![])?)
+                Statement::Expression(self.build_expression(expression, vec![].into())?)
             }
             ast::StatementObj::If { test, body, orelse } => Statement::If {
-                cond: self.build_expression(test, vec![])?,
+                cond: self.build_expression(test, vec![].into())?,
                 body: self.build_block(body)?,
                 orelse: orelse.map(|block| self.build_block(block)).transpose()?,
             },
             ast::StatementObj::While { test, body } => Statement::While {
-                cond: self.build_expression(test, vec![])?,
+                cond: self.build_expression(test, vec![].into())?,
                 body: self.build_block(body)?,
             },
             ast::StatementObj::For {
@@ -509,7 +546,7 @@ impl<'a> Context<'a> {
                 match assign {
                     Assign::Declare { target, .. } => Statement::For {
                         target: self.build_target(target),
-                        iter: self.build_expression(iter, vec![])?,
+                        iter: self.build_expression(iter, vec![].into())?,
                         body: self.build_block(body)?,
                     },
                     _ => panic!(),
@@ -520,7 +557,7 @@ impl<'a> Context<'a> {
         return Ok(statement);
     }
 
-    fn build_expression(&mut self, expression: ast::Expression, mut context_stack: Vec<ExprContext>) -> CResult<TypedExpression> {
+    fn build_expression(&mut self, expression: ast::Expression, mut context_stack: ExprContextStack) -> CResult<TypedExpression> {
         let Located(loc, obj) = expression;
         let expr_ty = self.expr_order.pop_front().unwrap();
 
@@ -542,7 +579,7 @@ impl<'a> Context<'a> {
                     let mut value = self.build_expression(*value, context_stack.clone())?;
 
                     if value.ty.is_mut() {
-                        value.obj = if context_stack.contains(&ExprContext::LVal) {
+                        value.obj = if context_stack.has(&ExprContext::LVal) {
                             ExpressionObj::BorrowMut(value.obj.into())
                         } else {
                             ExpressionObj::BorrowImmut(value.obj.into())
@@ -578,7 +615,7 @@ impl<'a> Context<'a> {
                             // function.
                             if let Ty::Function(..) = &expr_ty {
                             } else {
-                                value.obj = if context_stack.contains(&ExprContext::LVal) {
+                                value.obj = if context_stack.has(&ExprContext::LVal) {
                                     ExpressionObj::BorrowMut(value.obj.into())
                                 } else {
                                     ExpressionObj::BorrowImmut(value.obj.into())
@@ -663,7 +700,7 @@ impl<'a> Context<'a> {
                         .collect::<Result<Vec<_>, CoreError>>()?,
                 );
 
-                if !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) {
+                if !context_stack.has_any(&[ExprContext::LVal, ExprContext::Seed]) {
                     ExpressionObj::Mutable(vec.into())
                 } else {
                     vec
@@ -752,14 +789,14 @@ impl<'a> Context<'a> {
                     implicit_return: Some(temp.clone().into()),
                 });
 
-                if !context_stack.contains(&ExprContext::LVal) && !context_stack.contains(&ExprContext::Seed) {
+                if !context_stack.has_any(&[ExprContext::LVal, ExprContext::Seed]) {
                     ExpressionObj::Mutable(block.into())
                 } else {
                     block
                 }
             }
             ast::ExpressionObj::Str(s) => {
-                if context_stack.contains(&ExprContext::Seed) || context_stack.contains(&ExprContext::Directive)  || context_stack.contains(&ExprContext::Assert){
+                if context_stack.has_any(&[ExprContext::Seed, ExprContext::Directive, ExprContext::Assert]){
                     ExpressionObj::Literal(Literal::Str(s))
                 } else {
                     ExpressionObj::Rendered(quote! {
@@ -818,7 +855,7 @@ impl<'a> Context<'a> {
         &mut self,
         mut expression: TypedExpression,
         loc: &Location,
-        context_stack: Vec<ExprContext>
+        context_stack: ExprContextStack
     ) -> CResult<TypedExpression> {
         let transformation;
         (expression.ty, transformation) = match expression.ty {
@@ -1184,7 +1221,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     };
 
                     let loc = expression.0.clone();
-                    context.build_expression(expression, vec![ExprContext::Directive])?;
+                    context.build_expression(expression, vec![ExprContext::Directive].into())?;
 
                     if let Some(mut directives) = context.directives.take() {
                         artifact.directives.append(&mut directives);

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 
-use super::{super::generate::Feature, builtin::{prelude::MethodType, pyth::ExprContext}, check::Ty};
+use super::{super::generate::Feature, builtin::{prelude::MethodType, pyth::{ExprContext, ExprContextStack}}, check::Ty};
 use crate::core::Tree;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -294,8 +294,8 @@ impl TypedExpression {
     }
 
     /// Add a move to the expression, if appropriate to do so.
-    pub fn moved(mut self, context_stack: &Vec<ExprContext>) -> Self {
-        if !context_stack.contains(&ExprContext::Directive) && !context_stack.contains(&ExprContext::Seed) {
+    pub fn moved(mut self, context_stack: &ExprContextStack) -> Self {
+        if !context_stack.has_any(&[ExprContext::Directive, ExprContext::Seed]) {
             self.obj = ExpressionObj::Move(self.obj.into());
         }
 
