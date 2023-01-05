@@ -8,7 +8,6 @@ on:
       - main
   pull_request:
 
-
 jobs:
   check-examples:
     name: Check Examples
@@ -22,7 +21,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build
       # compile the examples + check for changes
-      - name: Compile all examples
-        run: ./tests/compile-examples.sh
+      - name: Compile all tests
+        run: ./tests/compile-tests.sh
       - name: Check for any changes
         run: ./tests/check-for-changes.sh
