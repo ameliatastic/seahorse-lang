@@ -66,6 +66,25 @@ class u8:
     def __ifloordiv__(self, other: 'u8') -> 'u8':
         pass
 
+    def __lt__(self, other: 'u8') -> bool:
+        pass
+
+    def __le__(self, other: 'u8') -> bool:
+        pass
+
+    def __eq__(self, other: 'u8') -> bool:
+        pass
+
+    def __ne__(self, other: 'u8') -> bool:
+        pass
+
+    def __ge__(self, other: 'u8') -> bool:
+        pass
+
+    def __gt__(self, other: 'u8') -> bool:
+        pass
+
+
 class u16:
     """16-bit unsigned integer."""
 
@@ -115,6 +134,24 @@ class u16:
         pass
 
     def __ifloordiv__(self, other: 'u16') -> 'u16':
+        pass
+
+    def __lt__(self, other: 'u16') -> bool:
+        pass
+
+    def __le__(self, other: 'u16') -> bool:
+        pass
+
+    def __eq__(self, other: 'u16') -> bool:
+        pass
+
+    def __ne__(self, other: 'u16') -> bool:
+        pass
+
+    def __ge__(self, other: 'u16') -> bool:
+        pass
+
+    def __gt__(self, other: 'u16') -> bool:
         pass
 
 class u32:
@@ -168,6 +205,24 @@ class u32:
     def __ifloordiv__(self, other: 'u32') -> 'u32':
         pass
 
+    def __lt__(self, other: 'u32') -> bool:
+        pass
+
+    def __le__(self, other: 'u32') -> bool:
+        pass
+
+    def __eq__(self, other: 'u32') -> bool:
+        pass
+
+    def __ne__(self, other: 'u32') -> bool:
+        pass
+
+    def __ge__(self, other: 'u32') -> bool:
+        pass
+
+    def __gt__(self, other: 'u32') -> bool:
+        pass
+
 class u64:
     """64-bit unsigned integer."""
 
@@ -219,6 +274,24 @@ class u64:
     def __ifloordiv__(self, other: 'u64') -> 'u64':
         pass
 
+    def __lt__(self, other: 'u64') -> bool:
+        pass
+
+    def __le__(self, other: 'u64') -> bool:
+        pass
+
+    def __eq__(self, other: 'u64') -> bool:
+        pass
+
+    def __ne__(self, other: 'u64') -> bool:
+        pass
+
+    def __ge__(self, other: 'u64') -> bool:
+        pass
+
+    def __gt__(self, other: 'u64') -> bool:
+        pass
+
 class u128:
     """128-bit unsigned integer."""
 
@@ -268,6 +341,24 @@ class u128:
         pass
 
     def __ifloordiv__(self, other: 'u128') -> 'u128':
+        pass
+
+    def __lt__(self, other: 'u128') -> bool:
+        pass
+
+    def __le__(self, other: 'u128') -> bool:
+        pass
+
+    def __eq__(self, other: 'u128') -> bool:
+        pass
+
+    def __ne__(self, other: 'u128') -> bool:
+        pass
+
+    def __ge__(self, other: 'u128') -> bool:
+        pass
+
+    def __gt__(self, other: 'u128') -> bool:
         pass
 
 class i8:
@@ -372,6 +463,24 @@ class i16:
     def __ifloordiv__(self, other: 'i16') -> 'i16':
         pass
 
+    def __lt__(self, other: 'i16') -> bool:
+        pass
+
+    def __le__(self, other: 'i16') -> bool:
+        pass
+
+    def __eq__(self, other: 'i16') -> bool:
+        pass
+
+    def __ne__(self, other: 'i16') -> bool:
+        pass
+
+    def __ge__(self, other: 'i16') -> bool:
+        pass
+
+    def __gt__(self, other: 'i16') -> bool:
+        pass
+
 class i32:
     """32-bit signed integer."""
 
@@ -421,6 +530,24 @@ class i32:
         pass
 
     def __ifloordiv__(self, other: 'i32') -> 'i32':
+        pass
+
+    def __lt__(self, other: 'i32') -> bool:
+        pass
+
+    def __le__(self, other: 'i32') -> bool:
+        pass
+
+    def __eq__(self, other: 'i32') -> bool:
+        pass
+
+    def __ne__(self, other: 'i32') -> bool:
+        pass
+
+    def __ge__(self, other: 'i32') -> bool:
+        pass
+
+    def __gt__(self, other: 'i32') -> bool:
         pass
 
 class i64:
@@ -474,6 +601,24 @@ class i64:
     def __ifloordiv__(self, other: 'i64') -> 'i64':
         pass
 
+    def __lt__(self, other: 'i64') -> bool:
+        pass
+
+    def __le__(self, other: 'i64') -> bool:
+        pass
+
+    def __eq__(self, other: 'i64') -> bool:
+        pass
+
+    def __ne__(self, other: 'i64') -> bool:
+        pass
+
+    def __ge__(self, other: 'i64') -> bool:
+        pass
+
+    def __gt__(self, other: 'i64') -> bool:
+        pass
+
 class i128:
     """128-bit signed integer."""
 
@@ -525,6 +670,24 @@ class i128:
     def __ifloordiv__(self, other: 'i128') -> 'i128':
         pass
 
+    def __lt__(self, other: 'i128') -> bool:
+        pass
+
+    def __le__(self, other: 'i128') -> bool:
+        pass
+
+    def __eq__(self, other: 'i128') -> bool:
+        pass
+
+    def __ne__(self, other: 'i128') -> bool:
+        pass
+
+    def __ge__(self, other: 'i128') -> bool:
+        pass
+
+    def __gt__(self, other: 'i128') -> bool:
+        pass
+
 class f64:
     """64-bit floating point number."""
 
@@ -574,6 +737,24 @@ class f64:
         pass
 
     def __ifloordiv__(self, other: 'f64') -> 'f64':
+        pass
+
+    def __lt__(self, other: 'f64') -> bool:
+        pass
+
+    def __le__(self, other: 'f64') -> bool:
+        pass
+
+    def __eq__(self, other: 'f64') -> bool:
+        pass
+
+    def __ne__(self, other: 'f64') -> bool:
+        pass
+
+    def __ge__(self, other: 'f64') -> bool:
+        pass
+
+    def __gt__(self, other: 'f64') -> bool:
         pass
 
 class Array(Generic[T, N]):
