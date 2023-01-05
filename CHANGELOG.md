@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Getters for `TokenAccount`'s mint key and `TokenMint`'s freeze authority, decimals, and supply
+- Type hints for comparison operators for numeric types
 
 ### Fixed
 
