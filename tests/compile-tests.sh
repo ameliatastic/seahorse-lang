@@ -11,3 +11,10 @@ do
     name="$(basename -- $f .py)"
     ${ROOT_DIR}/target/debug/seahorse compile $f > ${SCRIPT_DIR}/compiled-examples/$name.rs
 done
+
+for f in ${SCRIPT_DIR}/test-cases/*.py
+do
+    # get just the filename without directories or file extension (eg calculator)
+    name="$(basename -- $f .py)"
+    ${ROOT_DIR}/target/debug/seahorse compile $f > ${SCRIPT_DIR}/compiled-test-cases/$name.rs
+done
