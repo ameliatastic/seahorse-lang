@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6]
+
 ### Added
 
 - Getters for `TokenAccount`'s mint key and `TokenMint`'s freeze authority, decimals, and supply
