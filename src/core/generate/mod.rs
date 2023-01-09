@@ -62,7 +62,7 @@ impl ToTokens for Artifact {
             #![allow(unused_mut)]
 
             // Default imports
-            use crate::{id, assign, index_assign, seahorse_util::*, seahorse_const};
+            use crate::{id, seahorse_util::*};
             use std::{rc::Rc, cell::RefCell};
             use anchor_lang::{prelude::*, solana_program};
             // TODO might not need these, contexts are defined in lib.rs now
@@ -1312,16 +1312,6 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             #[cfg(feature = "pyth-sdk-solana")]
             pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
 
-            #[macro_export]
-            macro_rules! seahorse_const {
-                ($name:ident, $value:expr) => {
-                    macro_rules! $name {
-                        () => { $value }
-                    }
-                    pub(crate) use $name;
-                }
-            }
-
             // A "Python mutable" object.
             pub struct Mutable<T>(Rc<RefCell<T>>);
 
@@ -1430,6 +1420,19 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 pub seeds: Option<Vec<Vec<u8>>>
             }
 
+            // This macro just expands to another macro, which is how constants are defined.
+            // The `pub(crate) use ...` lets us treat the macro exactly like any other crate-
+            // exported item.
+            #[macro_export]
+            macro_rules! seahorse_const {
+                ($name:ident, $value:expr) => {
+                    macro_rules! $name {
+                        () => { $value }
+                    }
+                    pub(crate) use $name;
+                }
+            }
+
             // Because of how `RefCell::borrow_mut()/borrow()` works, if we try to borrow from the
             // same value we're assigning to it will cause an error at runtime, for example:
             //
@@ -1476,6 +1479,10 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                     $lval[temp_idx] = temp_rval;
                 }
             }
+
+            pub(crate) use seahorse_const;
+            pub(crate) use assign;
+            pub(crate) use index_assign;
         }
 
         #[program]
