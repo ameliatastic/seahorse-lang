@@ -169,13 +169,22 @@ pub enum Transformed {
 }
 
 /// Build context for a single function.
-struct Context<'a> {
-    check_output: &'a CheckOutput,
-    abs: &'a Vec<String>,
+struct Context {
     ix_context: Option<InstructionContext>,
     directives: Option<Vec<Directive>>,
     expr_order: VecDeque<Ty>,
     assign_order: VecDeque<Assign>,
+}
+
+impl From<TypecheckOutput> for Context {
+    fn from(typecheck: TypecheckOutput) -> Self {
+        Self {
+            ix_context: None,
+            directives: None,
+            expr_order: typecheck.expr_order.into(),
+            assign_order: typecheck.assign_order.into()
+        }
+    }
 }
 
 /// Create a finalized `TyExpr` based on a given `TyExpression` (a type expression defined in the
@@ -314,7 +323,7 @@ fn make_account_ty_expr(ty: Ty) -> AccountTyExpr {
     }
 }
 
-impl<'a> Context<'a> {
+impl Context {
     fn build_func(
         &mut self,
         func: ast::FunctionDef,
@@ -1121,13 +1130,24 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                 Item::Builtin(..) => {}
                                 Item::Defined(defined) => {
                                     let mut context = contexts.remove(&name).unwrap();
-                                    let mut signature = signatures.remove(&name).unwrap();
+                                    let signature = signatures.remove(&name).unwrap();
 
                                     match defined {
                                         Located(
                                             _,
+                                            ast::TopLevelStatementObj::Constant { name, value }
+                                        ) => {
+                                            let typecheck = match1!(context, FinalContext::Constant(typecheck) => typecheck);
+
+                                            let mut context: Context = typecheck.into();
+                                            let value = context.build_expression(value, vec![].into())?;
+
+                                            artifact.constants.push(Constant { name, value });
+                                        }
+                                        Located(
+                                            _,
                                             ast::TopLevelStatementObj::ClassDef {
-                                                mut name,
+                                                name,
                                                 body,
                                                 ..
                                             },
@@ -1154,14 +1174,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                                         ast::ClassDefStatementObj::MethodDef(func) => {
                                                             let typecheck = match1!(context, FinalContext::Class(ref mut typechecks) => typechecks.remove(&func.name).unwrap());
 
-                                                            let mut context = Context {
-                                                                check_output: &check_output,
-                                                                abs: &path,
-                                                                ix_context: None,
-                                                                directives: None,
-                                                                expr_order: typecheck.expr_order.into(),
-                                                                assign_order: typecheck.assign_order.into(),
-                                                            };
+                                                            let mut context: Context = typecheck.into();
                                                             let (method_type, signature) = methods_map.remove(&func.name).unwrap();
                                                             let func = context.build_func(func, signature)?;
 
@@ -1213,18 +1226,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                         ) => {
                                             let typecheck = match1!(context, FinalContext::Function(typecheck) => typecheck);
 
-                                            let mut context = Context {
-                                                check_output: &check_output,
-                                                abs: &path,
-                                                ix_context: None,
-                                                directives: None,
-                                                expr_order: typecheck.expr_order.into(),
-                                                assign_order: typecheck.assign_order.into(),
-                                            };
-                                            let signature = match signature {
-                                                Signature::Function(signature) => signature,
-                                                _ => panic!(),
-                                            };
+                                            let mut context: Context = typecheck.into();
+                                            let signature = match1!(signature, Signature::Function(signature) => signature);
                                             let func = context.build_func(func, signature)?;
 
                                             artifact.functions.push(func);
@@ -1239,14 +1242,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
 
                 let directives = match1!(contexts.remove(""), Some(FinalContext::Directives(directives)) => directives);
                 for (expression, typecheck) in directives.into_iter() {
-                    let mut context = Context {
-                        check_output: &check_output,
-                        abs: &path,
-                        ix_context: None,
-                        directives: Some(vec![]),
-                        expr_order: typecheck.expr_order.into(),
-                        assign_order: typecheck.assign_order.into()
-                    };
+                    let mut context: Context = typecheck.into();
+                    context.directives = Some(vec![]);
 
                     let loc = expression.0.clone();
                     context.build_expression(expression, vec![ExprContext::Directive].into())?;

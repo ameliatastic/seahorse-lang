@@ -49,6 +49,7 @@ impl ToTokens for StaticPath<'_> {
 impl ToTokens for Artifact {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
+            constants,
             uses,
             type_defs,
             functions,
@@ -61,13 +62,14 @@ impl ToTokens for Artifact {
             #![allow(unused_mut)]
 
             // Default imports
-            use crate::{id, assign, index_assign, seahorse_util::*};
+            use crate::{id, assign, index_assign, seahorse_util::*, seahorse_const};
             use std::{rc::Rc, cell::RefCell};
             use anchor_lang::{prelude::*, solana_program};
             // TODO might not need these, contexts are defined in lib.rs now
             use anchor_spl::token::{self, Token, Mint, TokenAccount};
 
             #(#uses)*
+            #(#constants)*
             #(#type_defs)*
             #(#functions)*
         });
@@ -126,6 +128,17 @@ impl ToTokens for Tree<Option<String>> {
                 }
             }
         })
+    }
+}
+
+impl ToTokens for Constant {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Self { name, value } = self;
+        let name = ident(name);
+
+        tokens.extend(quote! {
+            seahorse_const! { #name, #value }
+        });
     }
 }
 
@@ -1298,6 +1311,16 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             // Re-export for ease of access
             #[cfg(feature = "pyth-sdk-solana")]
             pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
+
+            #[macro_export]
+            macro_rules! seahorse_const {
+                ($name:ident, $value:expr) => {
+                    macro_rules! $name {
+                        () => { $value }
+                    }
+                    pub(crate) use $name;
+                }
+            }
 
             // A "Python mutable" object.
             pub struct Mutable<T>(Rc<RefCell<T>>);

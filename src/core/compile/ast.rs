@@ -39,7 +39,10 @@ pub enum Directive {
 
 /// A `const` declaration.
 #[derive(Clone, Debug)]
-pub struct Constant;
+pub struct Constant {
+    pub name: String,
+    pub value: TypedExpression
+}
 
 /// A type definition.
 #[derive(Clone, Debug)]

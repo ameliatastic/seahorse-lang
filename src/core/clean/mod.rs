@@ -11,6 +11,7 @@ use ast::*;
 enum Error {
     ImportAlias,
     ClassDefWithKeywords,
+    InvalidConstant,
     Async,
     ArbitraryTopLevelStatementObj,
     ArbitraryClassDefStatement,
@@ -54,6 +55,13 @@ impl Error {
         match self {
             Self::ImportAlias => CoreError::make_raw("imports aliases are currently not supported", ""),
             Self::ClassDefWithKeywords => CoreError::make_raw("class definition with keywords", ""),
+            Self::InvalidConstant => CoreError::make_raw(
+                "invalid constant",
+                concat!(
+                    "Hint: constants may be defined like this:\n\n",
+                    "\tMY_CONST = ..."
+                )
+            ),
             Self::Async => CoreError::make_raw("functions may not be async", ""),
             Self::ArbitraryTopLevelStatementObj => CoreError::make_raw(
                 "arbitrary top-level statement",
@@ -258,6 +266,25 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                     })
                     .collect::<Result<_, _>>()?,
             }),
+            py::StatementType::Assign { targets, value } => {
+                if targets.len() != 1 {
+                    Err(Error::InvalidConstant)
+                } else {
+                    let target = WithSrc::new(&src, targets.into_iter().next().unwrap()).try_into()?;
+
+                    if let Located(_, ExpressionObj::Id(name)) = target {
+                        Ok(TopLevelStatementObj::Constant {
+                            name,
+                            value: WithSrc::new(&src, value).try_into()?,
+                        })
+                    } else {
+                        Err(Error::InvalidConstant)
+                    }
+                }
+            }
+            py::StatementType::AnnAssign { .. } => {
+                Err(Error::InvalidConstant)
+            }
             py::StatementType::ClassDef {
                 name,
                 body,
