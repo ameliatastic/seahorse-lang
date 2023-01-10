@@ -12,6 +12,7 @@ enum Error {
     ImportAlias,
     ClassDefWithKeywords,
     InvalidConstant,
+    NonconstantConstant,
     Async,
     ArbitraryTopLevelStatementObj,
     ArbitraryClassDefStatement,
@@ -60,6 +61,13 @@ impl Error {
                 concat!(
                     "Hint: constants may be defined like this:\n\n",
                     "\tMY_CONST = ..."
+                )
+            ),
+            Self::NonconstantConstant => CoreError::make_raw(
+                "potentiall non-constant constant",
+                concat!(
+                    "Help: constants may only be made of simple expressions that are guaranteed to be constant.\n",
+                    "This excludes anything that calls a function (including constructors) or creates a mutable data type."
                 )
             ),
             Self::Async => CoreError::make_raw("functions may not be async", ""),
@@ -272,7 +280,10 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 } else {
                     let target = WithSrc::new(&src, targets.into_iter().next().unwrap()).try_into()?;
 
-                    if let Located(_, ExpressionObj::Id(name)) = target {
+                    if !validate_constant(&value) {
+                        Err(Error::NonconstantConstant)
+                    }
+                    else if let Located(_, ExpressionObj::Id(name)) = target {
                         Ok(TopLevelStatementObj::Constant {
                             name,
                             value: WithSrc::new(&src, value).try_into()?,
@@ -349,6 +360,29 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
         }
         .map(|ok| Located(location.clone(), ok))
         .map_err(|err| err.core(location))
+    }
+}
+
+fn validate_constant(constant: &py::Expression) -> bool {
+    match &constant.node {
+        py::ExpressionType::Number { .. }
+        | py::ExpressionType::String { .. }
+        | py::ExpressionType::Bytes { .. } // Doesn't exist yet, just future-proofing
+        | py::ExpressionType::False
+        | py::ExpressionType::True
+        | py::ExpressionType::None
+        | py::ExpressionType::Identifier { .. } => true,
+        py::ExpressionType::Attribute { value, .. } => validate_constant(&*value),
+        py::ExpressionType::Subscript { a, b } => (
+            validate_constant(&*a) && validate_constant(&*b)
+        ),
+        py::ExpressionType::Binop { a, b, .. } => (
+            validate_constant(&*a) && validate_constant(&*b)
+        ),
+        py::ExpressionType::Unop { a, .. } => validate_constant(&*a),
+        py::ExpressionType::Compare { vals, .. } => vals.iter().all(|val| validate_constant(&*val)),
+        py::ExpressionType::Tuple { elements } => elements.iter().all(|element| validate_constant(&*element)),
+        _ => false
     }
 }
 
