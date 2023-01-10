@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Constants may be defined in source files
 
+### Fixed
+
+- `sum` now works with floats (and also handles type errors properly)
+
 ## [0.2.6]
 
 ### Added
