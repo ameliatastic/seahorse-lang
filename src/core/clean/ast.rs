@@ -25,6 +25,10 @@ pub enum TopLevelStatementObj {
         path: Vec<String>,
         symbols: Vec<ImportSymbol>,
     },
+    Constant {
+        name: String,
+        value: Expression,
+    },
     ClassDef {
         name: String,
         body: Vec<ClassDefStatement>,

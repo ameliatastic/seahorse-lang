@@ -49,6 +49,7 @@ impl ToTokens for StaticPath<'_> {
 impl ToTokens for Artifact {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
+            constants,
             uses,
             type_defs,
             functions,
@@ -61,13 +62,14 @@ impl ToTokens for Artifact {
             #![allow(unused_mut)]
 
             // Default imports
-            use crate::{id, assign, index_assign, seahorse_util::*};
+            use crate::{id, seahorse_util::*};
             use std::{rc::Rc, cell::RefCell};
             use anchor_lang::{prelude::*, solana_program};
             // TODO might not need these, contexts are defined in lib.rs now
             use anchor_spl::token::{self, Token, Mint, TokenAccount};
 
             #(#uses)*
+            #(#constants)*
             #(#type_defs)*
             #(#functions)*
         });
@@ -126,6 +128,17 @@ impl ToTokens for Tree<Option<String>> {
                 }
             }
         })
+    }
+}
+
+impl ToTokens for Constant {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Self { name, value } = self;
+        let name = ident(name);
+
+        tokens.extend(quote! {
+            seahorse_const! { #name, #value }
+        });
     }
 }
 
@@ -1407,6 +1420,19 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 pub seeds: Option<Vec<Vec<u8>>>
             }
 
+            // This macro just expands to another macro, which is how constants are defined.
+            // The `pub(crate) use ...` lets us treat the macro exactly like any other crate-
+            // exported item.
+            #[macro_export]
+            macro_rules! seahorse_const {
+                ($name:ident, $value:expr) => {
+                    macro_rules! $name {
+                        () => { $value }
+                    }
+                    pub(crate) use $name;
+                }
+            }
+
             // Because of how `RefCell::borrow_mut()/borrow()` works, if we try to borrow from the
             // same value we're assigning to it will cause an error at runtime, for example:
             //
@@ -1453,6 +1479,10 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                     $lval[temp_idx] = temp_rval;
                 }
             }
+
+            pub(crate) use seahorse_const;
+            pub(crate) use assign;
+            pub(crate) use index_assign;
         }
 
         #[program]

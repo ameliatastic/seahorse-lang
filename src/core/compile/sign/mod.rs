@@ -1,7 +1,7 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
 use crate::core::{
-    clean::ast::{self as ca, ParamObj, Params},
+    clean::ast::{self as ca, Expression, ParamObj, Params},
     compile::{
         ast::ExpressionObj,
         build::{Transformation, Transformed},
@@ -13,7 +13,7 @@ use crate::core::{
 use crate::match1;
 // LOL I JUST LEARNED THAT I COULD DO THIS INSTEAD OF IMPORTING FROM CRATE
 use super::{
-    builtin::{Builtin, BuiltinSource},
+    builtin::{pyth::ExprContext, Builtin, BuiltinSource, Python},
     check::{DefinedType, ParamType, Ty, TyName},
 };
 use quote::quote;
@@ -93,6 +93,7 @@ pub type Signed = HashMap<String, Signature>;
 /// Signature of an object.
 #[derive(Clone, Debug)]
 pub enum Signature {
+    Constant(Expression),
     Class(ClassSignature),
     Function(FunctionSignature),
     Builtin(Builtin),
@@ -290,6 +291,7 @@ fn build_signature(
     let Located(loc, obj) = def;
 
     match obj {
+        ca::TopLevelStatementObj::Constant { value, .. } => Ok(Signature::Constant(value.clone())),
         ca::TopLevelStatementObj::ClassDef {
             body,
             bases,
@@ -479,10 +481,7 @@ fn build_signature(
             }
         }
         ca::TopLevelStatementObj::FunctionDef(ca::FunctionDef {
-            params,
-            // decorator_list,
-            returns,
-            ..
+            params, returns, ..
         }) => Ok(Signature::Function(build_function_signature(
             params, returns, abs, root,
         )?)),

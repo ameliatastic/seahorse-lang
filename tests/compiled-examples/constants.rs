@@ -12,42 +12,22 @@ use anchor_lang::{prelude::*, solana_program};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::{cell::RefCell, rc::Rc};
 
-#[event]
-#[derive(Clone, Debug, Default)]
-pub struct HelloEvent {
-    pub data: u8,
-    pub title: String,
-    pub owner: Pubkey,
-}
+seahorse_const! { MAX , 7 }
 
-impl Mutable<HelloEvent> {
-    fn __emit__(&self) {
-        let e = self.borrow();
+seahorse_const! { MESSAGE , "Hello constants" . to_string () }
 
-        emit!(HelloEvent {
-            data: e.data,
-            title: e.title.clone(),
-            owner: e.owner.clone()
-        })
+seahorse_const! { MIN , 2 }
+
+seahorse_const! { RANGE , (MAX ! () - MIN ! ()) }
+
+pub fn use_constants_handler<'info>(mut signer: SeahorseSigner<'info, '_>) -> () {
+    solana_program::msg!("{}", MESSAGE!());
+
+    for mut i in MIN!()..MAX!() {
+        solana_program::msg!("{} {}", "Step:".to_string(), i);
     }
-}
 
-impl HelloEvent {
-    pub fn __new__(data: u8, title: String, owner: Pubkey) -> Mutable<Self> {
-        let obj = HelloEvent { data, title, owner };
-
-        return Mutable::new(obj);
-    }
-}
-
-pub fn send_event_handler<'info>(
-    mut sender: SeahorseSigner<'info, '_>,
-    mut data: u8,
-    mut title: String,
-) -> () {
-    let mut event = HelloEvent::__new__(data.clone(), title.clone(), sender.key());
-
-    event.__emit__();
+    solana_program::msg!("{} {}", "Range:".to_string(), RANGE!());
 }
 
 // ===== lib.rs =====
@@ -217,27 +197,26 @@ pub mod seahorse_util {
 }
 
 #[program]
-mod event {
+mod constants {
     use super::*;
     use seahorse_util::*;
     use std::collections::HashMap;
 
     #[derive(Accounts)]
-    # [instruction (data : u8 , title : String)]
-    pub struct SendEvent<'info> {
+    pub struct UseConstants<'info> {
         #[account(mut)]
-        pub sender: Signer<'info>,
+        pub signer: Signer<'info>,
     }
 
-    pub fn send_event(ctx: Context<SendEvent>, data: u8, title: String) -> Result<()> {
+    pub fn use_constants(ctx: Context<UseConstants>) -> Result<()> {
         let mut programs = HashMap::new();
         let programs_map = ProgramsMap(programs);
-        let sender = SeahorseSigner {
-            account: &ctx.accounts.sender,
+        let signer = SeahorseSigner {
+            account: &ctx.accounts.signer,
             programs: &programs_map,
         };
 
-        send_event_handler(sender.clone(), data, title);
+        use_constants_handler(signer.clone());
 
         return Ok(());
     }

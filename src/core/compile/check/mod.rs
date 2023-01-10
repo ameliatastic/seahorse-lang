@@ -16,6 +16,7 @@ use crate::core::{
 use crate::match1;
 use quote::quote;
 use std::collections::HashMap;
+use std::mem::replace;
 
 use super::builtin::prelude::Transformed;
 
@@ -385,6 +386,7 @@ impl std::fmt::Display for TyName {
 /// "" in the `Checked` output.
 #[derive(Clone, Debug)]
 pub enum FinalContext {
+    Constant(TypecheckOutput),
     Class(HashMap<String, TypecheckOutput>),
     Function(TypecheckOutput),
     Directives(Vec<(ast::Expression, TypecheckOutput)>),
@@ -573,6 +575,19 @@ impl<'a> Context<'a> {
         return Ok(context.into());
     }
 
+    fn typecheck_constant(
+        constant: &ast::Expression,
+        sign_output: &'a SignOutput,
+        abs: &'a Vec<String>,
+    ) -> CResult<TypecheckOutput> {
+        let mut context = Self::new(sign_output, abs);
+
+        let ty = Ty::Param(context.free());
+        context.check_expr(ty, constant)?;
+
+        return Ok(context.into());
+    }
+
     /// Add a new free variable, returning the new type parameter.
     fn free(&mut self) -> usize {
         let param = self.types.len();
@@ -752,7 +767,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get the type of an attribute of a type.
-    fn attr(&self, t: Ty, attr: &String) -> Option<(Ty, Ty)> {
+    fn attr(&mut self, t: Ty, attr: &String) -> Option<(Ty, Ty)> {
         match t.clone() {
             Ty::Param(i) => self.attr(self.types[i].clone(), attr),
             Ty::IntParam(i) => self.attr(self.types[i].clone(), attr),
@@ -859,6 +874,14 @@ impl<'a> Context<'a> {
                     Some(Export::Item(..)) => {
                         match self.sign_output.tree.get_leaf(&abs).unwrap().get(attr) {
                             // wow this got ugly
+                            Some(Signature::Constant(expansion)) => {
+                                let ty = Ty::Param(self.free());
+
+                                Some((
+                                    Ty::Anonymous(0),
+                                    self.check_constant(ty, expansion).ok()?
+                                ))
+                            },
                             Some(Signature::Class(ClassSignature::Struct(StructSignature {
                                 is_account: true,
                                 ..
@@ -927,7 +950,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn defined_attr(&self, path: &Vec<String>, attr: &String) -> Option<(Ty, Ty)> {
+    fn defined_attr(&mut self, path: &Vec<String>, attr: &String) -> Option<(Ty, Ty)> {
         match self.sign_output.tree.get_leaf_ext(path).unwrap() {
             Signature::Class(ClassSignature::Struct(sig)) => {
                 if sig.fields.contains_key(attr) {
@@ -951,8 +974,9 @@ impl<'a> Context<'a> {
                     attr_ty
                 }
             }
-            Signature::Class(ClassSignature::Enum(..)) => None,
-            Signature::Function(..) => None,
+            Signature::Class(ClassSignature::Enum(..))
+            | Signature::Function(..)
+            | Signature::Constant(..) => None,
             Signature::Builtin(builtin) => builtin.attr(attr),
         }
     }
@@ -984,7 +1008,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 }
-                Signature::Function(..) => None,
+                Signature::Function(..) | Signature::Constant(..) => None,
                 Signature::Builtin(builtin) => {
                     builtin.static_attr(attr).map(|t| (Ty::Anonymous(0), t))
                 }
@@ -1447,6 +1471,10 @@ impl<'a> Context<'a> {
                     Some(Export::Import(Located(loc, import))) => match import {
                         ImportObj::SymbolPath(path) => {
                             match self.sign_output.tree.get_leaf_ext(path) {
+                                Some(Signature::Constant(expansion)) => {
+                                    let ty = self.check_constant(expr_ty.clone(), expansion)?;
+                                    self.unify(expr_ty, ty, loc)?
+                                }
                                 Some(Signature::Builtin(builtin)) => {
                                     let ty = self.deanonymize(builtin.ty());
                                     self.unify(expr_ty, ty, loc)?
@@ -1522,6 +1550,10 @@ impl<'a> Context<'a> {
                         path.push(var.clone());
 
                         match self.sign_output.tree.get_leaf_ext(&path) {
+                            Some(Signature::Constant(expansion)) => {
+                                let ty = self.check_constant(expr_ty.clone(), expansion)?;
+                                self.unify(expr_ty, ty, loc)?
+                            }
                             Some(Signature::Builtin(builtin)) => {
                                 let ty = self.deanonymize(builtin.ty());
                                 self.unify(expr_ty, ty, loc)?
@@ -1609,6 +1641,36 @@ impl<'a> Context<'a> {
         self.types[param] = expr_ty;
 
         return Ok(expr_i);
+    }
+
+    /// Check an expression indepedently. Works with a fresh copies of `types`, `scopes`, and
+    /// `expr_order` to keep this typecheck independent from everything else.
+    fn check_expr_independent(&mut self, expr_ty: Ty, expression: &ast::Expression) -> CResult<Ty> {
+        let scopes = replace(&mut self.scopes, vec![]);
+        let expr_order = replace(&mut self.expr_order, vec![]);
+
+        let res = self.check_expr(expr_ty, expression)?;
+        let ty = self.expr_order[res].clone();
+
+        self.scopes = scopes;
+        self.expr_order = expr_order;
+
+        return Ok(ty);
+    }
+
+    /// Check a constant expansion.
+    fn check_constant(&mut self, expr_ty: Ty, expansion: &ast::Expression) -> CResult<Ty> {
+        let ty = self.check_expr_independent(expr_ty, expansion)?;
+        let ty = Ty::Transformed(
+            ty.into(),
+            Transformation::new(|mut expr| {
+                let name = expr.obj;
+                expr.obj = ExpressionObj::Rendered(quote! { #name !() });
+                Ok(Transformed::Expression(expr))
+            }),
+        );
+
+        return Ok(ty);
     }
 
     /// Check a (binary) operation that needs to unify to type `t`.
@@ -2169,6 +2231,10 @@ impl TryFrom<SignOutput> for CheckOutput {
                 for (_, def) in namespace.iter() {
                     match def {
                         Export::Item(Item::Defined(Located(_, def))) => match def {
+                            ast::TopLevelStatementObj::Constant { name, value } => {
+                                let output = Context::typecheck_constant(value, &sign_output, path)?;
+                                checked.insert(name.clone(), FinalContext::Constant(output));
+                            }
                             ast::TopLevelStatementObj::FunctionDef(func) => {
                                 let signature = sign_output
                                     .tree

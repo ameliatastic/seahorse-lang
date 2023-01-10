@@ -391,7 +391,8 @@ fn build_python_namespace(
                     }
                 }
             }
-            ca::TopLevelStatementObj::ClassDef { name, .. }
+            ca::TopLevelStatementObj::Constant { name, .. }
+            | ca::TopLevelStatementObj::ClassDef { name, .. }
             | ca::TopLevelStatementObj::FunctionDef(ca::FunctionDef { name, .. }) => {
                 let export = Export::Item(Item::Defined(Located(loc.clone(), obj.clone())));
                 namespace.insert(name.clone(), export);
