@@ -514,12 +514,22 @@ impl BuiltinSource for Python {
                     Transformation::new(|mut expr| {
                         let iterable = match1!(expr.obj, ExpressionObj::Call { args, .. } => args.into_iter().next().unwrap());
 
-                        // TODO need to prevent errors by checking the type here like `Op::Add` does
+                        let init = match &expr.ty {
+                            Ty::Generic(TyName::Builtin(Builtin::Prelude(Prelude::RustInt(..))), _) => quote! { 0 },
+                            Ty::IntParam(..) => quote! { 0 },
+                            Ty::Generic(TyName::Builtin(Builtin::Prelude(Prelude::RustFloat)), _) => quote! { 0.0 },
+                            ty => {
+                                return Err(CoreError::make_raw(
+                                    format!("cannot perform sum of type {}", ty),
+                                    "Hint: sums can be performed on numeric types only."
+                                ))
+                            }
+                        };
 
                         expr.obj = ExpressionObj::Rendered(quote! {
                             // Rolling my own sum implementation here because Rust's `Iterator.sum`
                             // requires type info which is annoying to obtain
-                            #iterable.fold(0, |accum, elem| accum + elem)
+                            #iterable.fold(#init, |accum, elem| accum + elem)
                         });
 
                         Ok(Transformed::Expression(expr))
