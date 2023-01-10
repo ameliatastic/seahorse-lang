@@ -1,7 +1,7 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
 use crate::core::{
-    clean::ast::{self as ca, ParamObj, Params, Expression},
+    clean::ast::{self as ca, Expression, ParamObj, Params},
     compile::{
         ast::ExpressionObj,
         build::{Transformation, Transformed},
@@ -291,9 +291,7 @@ fn build_signature(
     let Located(loc, obj) = def;
 
     match obj {
-        ca::TopLevelStatementObj::Constant { value, .. } => {
-            Ok(Signature::Constant(value.clone()))
-        }
+        ca::TopLevelStatementObj::Constant { value, .. } => Ok(Signature::Constant(value.clone())),
         ca::TopLevelStatementObj::ClassDef {
             body,
             bases,
@@ -483,9 +481,7 @@ fn build_signature(
             }
         }
         ca::TopLevelStatementObj::FunctionDef(ca::FunctionDef {
-            params,
-            returns,
-            ..
+            params, returns, ..
         }) => Ok(Signature::Function(build_function_signature(
             params, returns, abs, root,
         )?)),

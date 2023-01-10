@@ -41,7 +41,7 @@ pub enum Directive {
 #[derive(Clone, Debug)]
 pub struct Constant {
     pub name: String,
-    pub value: TypedExpression
+    pub value: TypedExpression,
 }
 
 /// A type definition.

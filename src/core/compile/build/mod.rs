@@ -182,7 +182,7 @@ impl From<TypecheckOutput> for Context {
             ix_context: None,
             directives: None,
             expr_order: typecheck.expr_order.into(),
-            assign_order: typecheck.assign_order.into()
+            assign_order: typecheck.assign_order.into(),
         }
     }
 }

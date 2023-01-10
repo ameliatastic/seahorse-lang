@@ -278,12 +278,12 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 if targets.len() != 1 {
                     Err(Error::InvalidConstant)
                 } else {
-                    let target = WithSrc::new(&src, targets.into_iter().next().unwrap()).try_into()?;
+                    let target =
+                        WithSrc::new(&src, targets.into_iter().next().unwrap()).try_into()?;
 
                     if !validate_constant(&value) {
                         Err(Error::NonconstantConstant)
-                    }
-                    else if let Located(_, ExpressionObj::Id(name)) = target {
+                    } else if let Located(_, ExpressionObj::Id(name)) = target {
                         Ok(TopLevelStatementObj::Constant {
                             name,
                             value: WithSrc::new(&src, value).try_into()?,
@@ -293,9 +293,7 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                     }
                 }
             }
-            py::StatementType::AnnAssign { .. } => {
-                Err(Error::InvalidConstant)
-            }
+            py::StatementType::AnnAssign { .. } => Err(Error::InvalidConstant),
             py::StatementType::ClassDef {
                 name,
                 body,

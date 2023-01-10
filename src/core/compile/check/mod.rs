@@ -974,7 +974,9 @@ impl<'a> Context<'a> {
                     attr_ty
                 }
             }
-            Signature::Class(ClassSignature::Enum(..)) | Signature::Function(..) | Signature::Constant(..) => None,
+            Signature::Class(ClassSignature::Enum(..))
+            | Signature::Function(..)
+            | Signature::Constant(..) => None,
             Signature::Builtin(builtin) => builtin.attr(attr),
         }
     }
@@ -1659,11 +1661,14 @@ impl<'a> Context<'a> {
     /// Check a constant expansion.
     fn check_constant(&mut self, expr_ty: Ty, expansion: &ast::Expression) -> CResult<Ty> {
         let ty = self.check_expr_independent(expr_ty, expansion)?;
-        let ty = Ty::Transformed(ty.into(), Transformation::new(|mut expr| {
-            let name = expr.obj;
-            expr.obj = ExpressionObj::Rendered(quote! { #name !() });
-            Ok(Transformed::Expression(expr))
-        }));
+        let ty = Ty::Transformed(
+            ty.into(),
+            Transformation::new(|mut expr| {
+                let name = expr.obj;
+                expr.obj = ExpressionObj::Rendered(quote! { #name !() });
+                Ok(Transformed::Expression(expr))
+            }),
+        );
 
         return Ok(ty);
     }
