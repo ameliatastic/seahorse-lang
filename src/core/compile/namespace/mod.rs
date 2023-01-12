@@ -1,5 +1,6 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
+use crate::match1;
 use crate::core::{
     clean::ast as ca,
     compile::builtin::*,
@@ -13,6 +14,7 @@ enum Error {
     ImportNotFound(Vec<String>),
     CircularImport(Vec<String>),
     SymbolNotFound(String),
+    AutomaticImportsNotExported(Vec<String>),
     NotDefType(Vec<String>),
     NoSuchSymbol(Vec<String>),
 }
@@ -32,6 +34,18 @@ impl Error {
             ),
             Self::SymbolNotFound(symbol) => {
                 CoreError::make_raw(format!("symbol \"{}\" not found", symbol), "")
+            }
+            Self::AutomaticImportsNotExported(path) => {
+                CoreError::make_raw(
+                    "automatic import are not exported",
+                    format!(
+                        concat!(
+                            "Help: this is an automatic import, which does not get exported from other modules.\n",
+                            "You still have access to this object, just use its name: {}"
+                        ),
+                        path.last().unwrap()
+                    )
+                )
             }
             Self::NotDefType(path) => {
                 CoreError::make_raw(format!("\"{}\" is not a class", path_to_string(&path)), "")
@@ -68,31 +82,31 @@ pub struct NamespaceOutput {
 }
 
 /// The (global) namespace for a module.
-pub type Namespace = BTreeMap<String, Export>;
+pub type Namespace = BTreeMap<String, NamespacedObject>;
 
 impl Tree<Namespace> {
     /// Get an item given an absolute path.
-    pub fn get_item<'a>(&'a self, abs: &Vec<String>) -> Option<&'a Item> {
-        let mut curr = self;
+    // pub fn get_item<'a>(&'a self, abs: &Vec<String>) -> Option<&'a Item> {
+    //     let mut curr = self;
 
-        for (i, part) in abs.iter().enumerate() {
-            match curr {
-                Self::Node(package) => {
-                    curr = package.get(part)?;
-                }
-                Self::Leaf(namespace) => {
-                    if i == abs.len() - 1 {
-                        return namespace.get(part).and_then(|export| match export {
-                            Export::Item(item) => Some(item),
-                            _ => None,
-                        });
-                    }
-                }
-            }
-        }
+    //     for (i, part) in abs.iter().enumerate() {
+    //         match curr {
+    //             Self::Node(package) => {
+    //                 curr = package.get(part)?;
+    //             }
+    //             Self::Leaf(namespace) => {
+    //                 if i == abs.len() - 1 {
+    //                     return namespace.get(part).and_then(|export| match export {
+    //                         NamespacedObject::Item(item) => Some(item),
+    //                         _ => None,
+    //                     });
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        return None;
-    }
+    //     return None;
+    // }
 
     /// Advance a relative path as far as possible.
     ///
@@ -120,12 +134,12 @@ impl Tree<Namespace> {
 
         match self.get(abs) {
             Some(Tree::Leaf(namespace)) => match namespace.get(&next) {
-                Some(Export::Item(..)) => {
+                Some(NamespacedObject::Automatic(..) | NamespacedObject::Item(..)) => {
                     let mut abs = abs.clone();
                     abs.push(next);
                     Some((abs, rel.into()))
                 }
-                Some(Export::Import(Located(_, import))) => match import {
+                Some(NamespacedObject::Import(Located(_, import))) => match import {
                     ImportObj::SymbolPath(path) => {
                         let mut abs = path.clone();
                         rel.push_front(abs.pop().unwrap());
@@ -155,7 +169,8 @@ impl Tree<Namespace> {
 
 /// Module export.
 #[derive(Clone, Debug)]
-pub enum Export {
+pub enum NamespacedObject {
+    Automatic(Builtin),
     Import(Import),
     Item(Item),
 }
@@ -209,17 +224,6 @@ impl TryFrom<pre::ModuleRegistry> for NamespaceOutput {
     }
 }
 
-/// Match and extract against a single pattern, panicking if no match.
-/// TODO move this to utils?
-macro_rules! match1 {
-    ($obj:expr, $var:pat => $up:expr) => {
-        match $obj {
-            $var => $up,
-            _ => panic!(),
-        }
-    };
-}
-
 impl Tree<Namespace> {
     pub fn build_ty(&self, ty_expr: &ca::TyExpression, abs: &Vec<String>) -> CResult<Ty> {
         let Located(loc, obj) = ty_expr;
@@ -234,8 +238,15 @@ impl Tree<Namespace> {
                 let base = match self.advance_path(base, abs) {
                     Some((path, rem)) => {
                         if rem.len() == 0 {
-                            match self.get_item(&path).unwrap() {
-                                Item::Defined(def) => {
+                            match self.get_leaf_ext(&path).unwrap() {
+                                NamespacedObject::Automatic(builtin) => {
+                                    if !path.starts_with(&abs) {
+                                        Err(Error::AutomaticImportsNotExported(path).core().located(loc.clone()))
+                                    } else {
+                                        Ok(TyName::Builtin(builtin.clone()))
+                                    }
+                                }
+                                NamespacedObject::Item(Item::Defined(def)) => {
                                     let Located(_, obj) = def;
                                     match obj {
                                         ca::TopLevelStatementObj::ClassDef { .. } => {
@@ -246,13 +257,14 @@ impl Tree<Namespace> {
                                         }
                                     }
                                 }
-                                Item::Builtin(builtin) => {
+                                NamespacedObject::Item(Item::Builtin(builtin)) => {
                                     builtin
                                         .as_instance(&params)
                                         .map_err(|err| err.located(loc.clone()))?;
 
                                     Ok(TyName::Builtin(builtin.clone()))
                                 }
+                                _ => panic!()
                             }
                         } else {
                             Err(Error::NoSuchSymbol(base.clone())
@@ -260,6 +272,7 @@ impl Tree<Namespace> {
                                 .located(loc.clone()))
                         }
                     }
+                    // TODO rewrite to use the shit
                     _ if base.len() == 1 => match Python::get_by_name(base.get(0).unwrap()) {
                         Some(builtin) => Ok(TyName::Builtin(Builtin::Python(builtin))),
                         _ => Err(Error::NoSuchSymbol(base.clone())
@@ -330,6 +343,10 @@ fn build_python_namespace(
 ) -> CResult<Namespace> {
     let mut namespace = BTreeMap::new();
 
+    // Automatic imports
+    namespace.append(&mut prelude::namespace());
+    namespace.append(&mut python::namespace());
+
     for statement in module.statements.iter() {
         let Located(loc, obj) = statement;
         match obj {
@@ -350,7 +367,7 @@ fn build_python_namespace(
                     let obj =
                         get_import_obj(wip, &abs, None).map_err(|err| err.located(loc.clone()))?;
                     let name = alias.clone().unwrap_or(symbol.clone());
-                    namespace.insert(name, Export::Import(Located(loc.clone(), obj)));
+                    namespace.insert(name, NamespacedObject::Import(Located(loc.clone(), obj)));
                 }
             }
             ca::TopLevelStatementObj::ImportFrom {
@@ -371,7 +388,16 @@ fn build_python_namespace(
                     if symbol.as_str() == "*" {
                         let glob = match wip.get(&abs).unwrap() {
                             Tree::Leaf(Wip::Done(namespace)) => {
-                                namespace.keys().collect::<Vec<_>>()
+                                namespace.iter()
+                                    .filter_map(|(name, object)| {
+                                        // Filter out the automatic imports
+                                        if let NamespacedObject::Automatic(..) = object {
+                                            None
+                                        } else {
+                                            Some(name)
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
                             }
                             Tree::Node(package) => package.keys().collect::<Vec<_>>(),
                             _ => panic!(),
@@ -381,20 +407,20 @@ fn build_python_namespace(
                             let obj = get_import_obj(wip, &abs, Some(symbol))
                                 .map_err(|err| err.located(loc.clone()))?;
                             namespace
-                                .insert(symbol.clone(), Export::Import(Located(loc.clone(), obj)));
+                                .insert(symbol.clone(), NamespacedObject::Import(Located(loc.clone(), obj)));
                         }
                     } else {
                         let obj = get_import_obj(wip, &abs, Some(symbol))
                             .map_err(|err| err.located(loc.clone()))?;
                         let name = alias.clone().unwrap_or(symbol.clone());
-                        namespace.insert(name, Export::Import(Located(loc.clone(), obj)));
+                        namespace.insert(name, NamespacedObject::Import(Located(loc.clone(), obj)));
                     }
                 }
             }
             ca::TopLevelStatementObj::Constant { name, .. }
             | ca::TopLevelStatementObj::ClassDef { name, .. }
             | ca::TopLevelStatementObj::FunctionDef(ca::FunctionDef { name, .. }) => {
-                let export = Export::Item(Item::Defined(Located(loc.clone(), obj.clone())));
+                let export = NamespacedObject::Item(Item::Defined(Located(loc.clone(), obj.clone())));
                 namespace.insert(name.clone(), export);
             }
             ca::TopLevelStatementObj::Expression(..) => {}

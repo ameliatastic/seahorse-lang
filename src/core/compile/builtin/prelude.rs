@@ -83,7 +83,7 @@ pub fn namespace() -> Namespace {
     for (name, obj) in data.into_iter() {
         namespace.insert(
             name.to_string(),
-            Export::Item(Item::Builtin(Builtin::Prelude(obj))),
+            NamespacedObject::Automatic(Builtin::Prelude(obj)),
         );
     }
 

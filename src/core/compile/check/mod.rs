@@ -858,7 +858,8 @@ impl<'a> Context<'a> {
             },
             Ty::Path(mut abs) => match self.sign_output.namespace_output.tree.get(&abs) {
                 Some(Tree::Leaf(namespace)) => match namespace.get(attr) {
-                    Some(Export::Import(import)) => match import {
+                    Some(NamespacedObject::Automatic(..)) => None,
+                    Some(NamespacedObject::Import(import)) => match import {
                         Located(_, ImportObj::SymbolPath(abs)) => {
                             let mut abs = abs.clone();
                             let attr = abs.pop().unwrap();
@@ -871,7 +872,7 @@ impl<'a> Context<'a> {
                             Some((Ty::Anonymous(0), Ty::Path(abs.clone())))
                         }
                     },
-                    Some(Export::Item(..)) => {
+                    Some(NamespacedObject::Item(..)) => {
                         match self.sign_output.tree.get_leaf(&abs).unwrap().get(attr) {
                             // wow this got ugly
                             Some(Signature::Constant(expansion)) => {
@@ -1468,7 +1469,7 @@ impl<'a> Context<'a> {
                     self.unify(expr_ty, Ty::Param(param_var), loc)?
                 }
                 None => match self.namespace.get(var) {
-                    Some(Export::Import(Located(loc, import))) => match import {
+                    Some(NamespacedObject::Import(Located(loc, import))) => match import {
                         ImportObj::SymbolPath(path) => {
                             match self.sign_output.tree.get_leaf_ext(path) {
                                 Some(Signature::Constant(expansion)) => {
@@ -1545,7 +1546,7 @@ impl<'a> Context<'a> {
                             self.unify(expr_ty, Ty::Path(path.clone()), loc)?
                         }
                     },
-                    Some(Export::Item(..)) => {
+                    Some(NamespacedObject::Automatic(..) | NamespacedObject::Item(..)) => {
                         let mut path = self.abs.clone();
                         path.push(var.clone());
 
@@ -2230,7 +2231,7 @@ impl TryFrom<SignOutput> for CheckOutput {
 
                 for (_, def) in namespace.iter() {
                     match def {
-                        Export::Item(Item::Defined(Located(_, def))) => match def {
+                        NamespacedObject::Item(Item::Defined(Located(_, def))) => match def {
                             ast::TopLevelStatementObj::Constant { name, value } => {
                                 let output = Context::typecheck_constant(value, &sign_output, path)?;
                                 checked.insert(name.clone(), FinalContext::Constant(output));

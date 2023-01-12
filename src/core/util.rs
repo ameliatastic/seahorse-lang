@@ -1,6 +1,6 @@
 use owo_colors::OwoColorize;
 use rustpython_parser::ast::Location as SrcLocation;
-use std::{collections::HashMap, error, fmt, rc::Rc};
+use std::{collections::{HashMap, BTreeMap}, error, fmt, rc::Rc};
 
 /// Match and extract against a single pattern, panicking if no match.
 #[macro_export]
@@ -419,6 +419,16 @@ impl<T> Tree<Option<T>> {
 }
 
 impl<T> Tree<HashMap<String, T>> {
+    /// Get the "leaf of a leaf" from a tree.
+    pub fn get_leaf_ext<'a>(&'a self, path: &Vec<String>) -> Option<&'a T> {
+        let mut path = path.clone();
+        let name = path.pop()?;
+
+        return self.get_leaf(&path).and_then(|leaf| leaf.get(&name));
+    }
+}
+
+impl<T> Tree<BTreeMap<String, T>> {
     /// Get the "leaf of a leaf" from a tree.
     pub fn get_leaf_ext<'a>(&'a self, path: &Vec<String>) -> Option<&'a T> {
         let mut path = path.clone();

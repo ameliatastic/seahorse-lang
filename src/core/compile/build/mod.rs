@@ -1104,7 +1104,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
 
                 for (name, export) in namespace.into_iter() {
                     match export {
-                        Export::Import(Located(_, ImportObj::SymbolPath(mut path) | ImportObj::ModulePath(mut path) | ImportObj::PackagePath(mut path))) => {
+                        NamespacedObject::Automatic(..) => {},
+                        NamespacedObject::Import(Located(_, ImportObj::SymbolPath(mut path) | ImportObj::ModulePath(mut path) | ImportObj::PackagePath(mut path))) => {
                             let mut node = match1!(artifact.uses.get_mut(0), Some(Use { tree: Tree::Node(node), .. }) => node);
                             let last = path.pop().unwrap();
 
@@ -1125,7 +1126,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
 
                             node.insert(last, Tree::Leaf(None));
                         }
-                        Export::Item(item) => {
+                        NamespacedObject::Item(item) => {
                             match item {
                                 Item::Builtin(..) => {}
                                 Item::Defined(defined) => {

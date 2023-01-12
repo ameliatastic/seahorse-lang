@@ -4,6 +4,8 @@ use crate::{
     core::compile::{ast::*, build::*, builtin::*},
     match1,
 };
+use std::collections::BTreeMap;
+use prelude::{NamespacedObject, Namespace};
 use quote::quote;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,6 +35,42 @@ pub enum Python {
     Sorted,
     Sum,
     ListConstructor,
+}
+
+/// Create the Python builtins namespace.
+pub fn namespace() -> Namespace {
+    let data = [
+        ("None", Python::None),
+        ("List", Python::List),
+        ("Tuple", Python::Tuple),
+        ("int", Python::Int),
+        ("bool", Python::Bool),
+        ("str", Python::Str),
+        ("abs", Python::Abs),
+        ("print", Python::Print),
+        ("min", Python::Min),
+        ("max", Python::Max),
+        ("round", Python::Round),
+        ("range", Python::Range),
+        ("len", Python::Len),
+        ("enumerate", Python::Enumerate),
+        ("filter", Python::Filter),
+        ("map", Python::Map),
+        ("zip", Python::Zip),
+        ("sorted", Python::Sorted),
+        ("sum", Python::Sum),
+        ("list", Python::ListConstructor),
+    ];
+
+    let mut namespace = BTreeMap::new();
+    for (name, obj) in data.into_iter() {
+        namespace.insert(
+            name.to_string(),
+            NamespacedObject::Automatic(Builtin::Python(obj)),
+        );
+    }
+
+    return namespace;
 }
 
 impl Python {
