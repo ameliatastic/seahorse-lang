@@ -860,15 +860,12 @@ impl<'a> Context<'a> {
                 Some(Tree::Leaf(namespace)) => match namespace.get(attr) {
                     Some(NamespacedObject::Automatic(..)) => None,
                     Some(NamespacedObject::Import(import)) => match import {
-                        Located(_, ImportObj::SymbolPath(abs)) => {
+                        Located(_, ImportObj { path, import_type: ImportType::Symbol, .. }) => {
                             let mut abs = abs.clone();
                             let attr = abs.pop().unwrap();
                             self.attr(Ty::Path(abs), &attr)
                         }
-                        Located(_, ImportObj::ModulePath(abs)) => {
-                            Some((Ty::Anonymous(0), Ty::Path(abs.clone())))
-                        }
-                        Located(_, ImportObj::PackagePath(abs)) => {
+                        Located(_, ImportObj { path, .. }) => {
                             Some((Ty::Anonymous(0), Ty::Path(abs.clone())))
                         }
                     },
@@ -1470,7 +1467,7 @@ impl<'a> Context<'a> {
                 }
                 None => match self.namespace.get(var) {
                     Some(NamespacedObject::Import(Located(loc, import))) => match import {
-                        ImportObj::SymbolPath(path) => {
+                        ImportObj { path, import_type: ImportType::Symbol, .. } => {
                             match self.sign_output.tree.get_leaf_ext(path) {
                                 Some(Signature::Constant(expansion)) => {
                                     let ty = self.check_constant(expr_ty.clone(), expansion)?;
@@ -1542,7 +1539,7 @@ impl<'a> Context<'a> {
                             }
                             // TODO get object signature, unify with type
                         }
-                        ImportObj::ModulePath(path) | ImportObj::PackagePath(path) => {
+                        ImportObj { path, .. } => {
                             self.unify(expr_ty, Ty::Path(path.clone()), loc)?
                         }
                     },

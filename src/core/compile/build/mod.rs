@@ -1092,7 +1092,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
         );
 
         let mut tree = tree
-            .map_with_path(|(mut contexts, (mut signatures, namespace)), path| {
+            .map_with_path(|(mut contexts, (mut signatures, namespace)), abs| {
                 let mut artifact = Artifact {
                     features: BTreeSet::new(),
                     uses: vec![Use { rooted: true, tree: Tree::Node(HashMap::new()) }],
@@ -1105,7 +1105,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                 for (name, export) in namespace.into_iter() {
                     match export {
                         NamespacedObject::Automatic(..) => {},
-                        NamespacedObject::Import(Located(_, ImportObj::SymbolPath(mut path) | ImportObj::ModulePath(mut path) | ImportObj::PackagePath(mut path))) => {
+                        NamespacedObject::Import(Located(_, ImportObj { mut path, is_builtin: false, .. })) => {
                             let mut node = match1!(artifact.uses.get_mut(0), Some(Use { tree: Tree::Node(node), .. }) => node);
                             let last = path.pop().unwrap();
 
@@ -1238,6 +1238,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                 }
                             }
                         }
+                        _ => {}
                     }
                 }
 
