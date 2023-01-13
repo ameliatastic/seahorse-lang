@@ -1105,6 +1105,13 @@ impl TryFrom<CheckOutput> for BuildOutput {
                 for (name, export) in namespace.into_iter() {
                     match export {
                         NamespacedObject::Automatic(..) => {},
+                        NamespacedObject::Import(Located(_, ImportObj { path, is_builtin: true, .. })) => {
+                            // For builtins that resolve to imports, check for features that need to
+                            // be made available
+                            if path.starts_with(&["sh".to_string(), "seahorse".to_string(), "pyth".to_string()]) {
+                                artifact.features.insert(Feature::Pyth);
+                            }
+                        }
                         NamespacedObject::Import(Located(_, ImportObj { mut path, is_builtin: false, .. })) => {
                             let mut node = match1!(artifact.uses.get_mut(0), Some(Use { tree: Tree::Node(node), .. }) => node);
                             let last = path.pop().unwrap();
@@ -1257,15 +1264,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
-                // Prune all Seahorse builtins after checking for dependencies ("if pyth is
-                // accessible then add it to the feature set")
-                if
-                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "pyth".to_string()]).is_some() ||
-                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "self".to_string()]).is_some()
-                {
-                    artifact.features.insert(Feature::Pyth);
-                }
-                artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
+                // Prune all Seahorse builtins
+                // artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);
             })
