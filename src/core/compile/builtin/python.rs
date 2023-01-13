@@ -73,36 +73,6 @@ pub fn namespace() -> Namespace {
     return namespace;
 }
 
-impl Python {
-    pub fn get_by_name(name: &str) -> Option<Self> {
-        Some(match name {
-            "None" => Self::None,
-            "List" => Self::List,
-            "Tuple" => Self::Tuple,
-            "int" => Self::Int,
-            "bool" => Self::Bool,
-            "str" => Self::Str,
-            "abs" => Self::Abs,
-            "print" => Self::Print,
-            "min" => Self::Min,
-            "max" => Self::Max,
-            "round" => Self::Round,
-            "range" => Self::Range,
-            "len" => Self::Len,
-            "enumerate" => Self::Enumerate,
-            "filter" => Self::Filter,
-            "map" => Self::Map,
-            "zip" => Self::Zip,
-            "sorted" => Self::Sorted,
-            "sum" => Self::Sum,
-            "list" => Self::ListConstructor,
-            _ => {
-                return None;
-            }
-        })
-    }
-}
-
 impl BuiltinSource for Python {
     fn name(&self) -> String {
         match self {

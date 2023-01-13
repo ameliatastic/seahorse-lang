@@ -145,7 +145,10 @@ impl BuiltinSource for Pyth {
                             });
 
                             Ok(Transformed::Expression(expr))
-                        }, Some(ExprContext::Seed)),
+                        },
+                        // Seed context is added to prevent the string literal from expanding into
+                        // a call to .to_string()
+                        Some(ExprContext::Seed)),
                     ),
                 ),
             )),

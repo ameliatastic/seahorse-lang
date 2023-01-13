@@ -1456,10 +1456,9 @@ impl<'a> Context<'a> {
                 }
                 self.unify(expr_ty, Ty::python(Python::Str, vec![]), loc)?
             }
-            // Three levels of checks for an `Id`:
+            // Two levels of checks for an `Id`:
             // 1. Check to see if a matching variable was declared locally
             // 2. Check to see if a matching name was imported/declared in the namespace
-            // 3. Check to see if a matching Python builtin exists
             ast::ExpressionObj::Id(var) => match self.find_var(var) {
                 Some(level) => {
                     let param_var = *self.scopes[level].get(var).unwrap();
@@ -1610,12 +1609,7 @@ impl<'a> Context<'a> {
                         }
                     }
                     None => {
-                        if let Some(builtin) = Python::get_by_name(&var) {
-                            let ty = self.deanonymize(builtin.ty());
-                            self.unify(expr_ty, ty, loc)?
-                        } else {
-                            return Err(Error::VarNotFound(var.clone()).core(loc));
-                        }
+                        return Err(Error::VarNotFound(var.clone()).core(loc));
                     }
                 },
             },

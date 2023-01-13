@@ -279,13 +279,6 @@ impl Tree<Namespace> {
                                 .located(loc.clone()))
                         }
                     }
-                    // TODO rewrite to use the shit
-                    _ if base.len() == 1 => match Python::get_by_name(base.get(0).unwrap()) {
-                        Some(builtin) => Ok(TyName::Builtin(Builtin::Python(builtin))),
-                        _ => Err(Error::NoSuchSymbol(base.clone())
-                            .core()
-                            .located(loc.clone())),
-                    },
                     _ => Err(Error::NoSuchSymbol(base.clone())
                         .core()
                         .located(loc.clone())),
