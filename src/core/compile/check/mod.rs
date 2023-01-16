@@ -14,6 +14,7 @@ use crate::core::{
     util::*,
 };
 use crate::match1;
+use prelude::ExprContext;
 use quote::quote;
 use std::collections::HashMap;
 use std::mem::replace;
@@ -806,9 +807,30 @@ impl<'a> Context<'a> {
                                 vec![],
                                 Ty::Transformed(
                                     Ty::prelude(Prelude::Pubkey, vec![]).into(),
-                                    Transformation::new(|expr| { 
+                                    Transformation::new_with_context(|mut expr, context_stack| {
+                                        if !context_stack.has(&ExprContext::Seed) {
+                                            // If not in a seed, rewrite account.key() to account.borrow().__account__.key()
+
+                                            let account = match1!(expr.obj, ExpressionObj::Call { function, .. } => *function);
+                                            let account = match1!(account.obj, ExpressionObj::Attribute { value, .. } => *value);
+
+                                            // add the .borrow().__account__.key()
+                                            let value = ExpressionObj::BorrowImmut(account.into());
+                                            let value = ExpressionObj::Attribute {
+                                                value: value.into(),
+                                                name: String::from("__account__"),
+                                            };
+                                            let value = ExpressionObj::Call { 
+                                                function: ExpressionObj::Attribute { 
+                                                    value: value.into(),
+                                                    name: "key".to_string(),
+                                                }.into(),
+                                                args: vec![]
+                                            };
+                                            expr.obj = value;
+                                        }
                                         Ok(Transformed::Expression(expr))
-                                    })
+                                    }, None)
                                 )
                             )
                         )),
@@ -1459,7 +1481,11 @@ impl<'a> Context<'a> {
                 }
                 None => match self.namespace.get(var) {
                     Some(NamespacedObject::Import(Located(loc, import))) => match import {
-                        ImportObj { path, import_type: ImportType::Symbol, .. } => {
+                        ImportObj {
+                            path,
+                            import_type: ImportType::Symbol,
+                            ..
+                        } => {
                             match self.sign_output.tree.get_leaf_ext(path) {
                                 Some(Signature::Constant(expansion)) => {
                                     let ty = self.check_constant(expr_ty.clone(), expansion)?;

@@ -10,8 +10,7 @@ use crate::{
     match1,
 };
 use heck::ToPascalCase;
-use owo_colors::OwoColorize;
-use quote::{format_ident, quote};
+use quote::quote;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     rc::Rc,
@@ -625,23 +624,6 @@ impl Context {
                         value: value.into(),
                         name,
                     },
-                    // Special case: account key() is under account.borrow().__account__.key(), except in seeds
-                    // For seeds we just use the attribute as usual, eg account.key(), so only special case when not a seed
-                    // Note that this only applies to key, other attributes should use the generic ty case below
-                    Ty::Generic(TyName::Defined(_, DefinedType::Account), _)
-                        if !context_stack.has(&ExprContext::Seed) && name.eq("key") =>
-                    {
-                        let value = ExpressionObj::BorrowImmut(value.obj.into());
-                        let value = ExpressionObj::Attribute {
-                            value: value.into(),
-                            name: String::from("__account__"),
-                        };
-
-                        ExpressionObj::Attribute {
-                            value: value.into(),
-                            name,
-                        }
-                    }
                     ty => {
                         if ty.is_mut() {
                             // Methods of custom types are impl'd on `Mutable<T>`, not `T` - this

@@ -7,7 +7,7 @@ pub mod program;
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(unused_mut)]
-use crate::{assign, id, index_assign, seahorse_util::*};
+use crate::{id, seahorse_util::*};
 use anchor_lang::{prelude::*, solana_program};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::{cell::RefCell, rc::Rc};
@@ -222,6 +222,19 @@ pub mod seahorse_util {
     }
 
     #[macro_export]
+    macro_rules! seahorse_const {
+        ($ name : ident , $ value : expr) => {
+            macro_rules! $name {
+                () => {
+                    $value
+                };
+            }
+
+            pub(crate) use $name;
+        };
+    }
+
+    #[macro_export]
     macro_rules! assign {
         ($ lval : expr , $ rval : expr) => {{
             let temp = $rval;
@@ -239,6 +252,12 @@ pub mod seahorse_util {
             $lval[temp_idx] = temp_rval;
         };
     }
+
+    pub(crate) use assign;
+
+    pub(crate) use index_assign;
+
+    pub(crate) use seahorse_const;
 }
 
 #[program]
