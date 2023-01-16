@@ -218,11 +218,11 @@ impl TryFrom<NamespaceOutput> for SignOutput {
 
                 for (name, export) in namespace.iter() {
                     match export {
-                        Export::Item(Item::Defined(def)) => {
+                        NamespacedObject::Item(Item::Defined(def)) => {
                             let signature = build_signature(def, abs, &namespace_output.tree)?;
                             signatures.insert(name.clone(), signature);
                         }
-                        Export::Item(Item::Builtin(builtin)) => {
+                        NamespacedObject::Automatic(builtin) | NamespacedObject::Item(Item::Builtin(builtin)) => {
                             signatures.insert(builtin.name(), Signature::Builtin(builtin.clone()));
                         }
                         _ => {}

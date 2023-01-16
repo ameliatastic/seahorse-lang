@@ -35,7 +35,7 @@ pub fn namespace() -> Namespace {
     for (name, obj) in data.into_iter() {
         namespace.insert(
             name.to_string(),
-            Export::Item(Item::Builtin(Builtin::Pyth(obj))),
+            NamespacedObject::Item(Item::Builtin(Builtin::Pyth(obj))),
         );
     }
 
@@ -82,7 +82,7 @@ impl BuiltinSource for Pyth {
                     )],
                     Ty::Transformed(
                         Ty::pyth(Self::PriceFeed, vec![]).into(),
-                        Transformation::new(|mut expr| {
+                        Transformation::new_with_context(|mut expr, _| {
                             let (function, product) = match1!(expr.obj, ExpressionObj::Call { function, args } => (*function, args.into_iter().next().unwrap()));
                             let price = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
 
@@ -145,7 +145,10 @@ impl BuiltinSource for Pyth {
                             });
 
                             Ok(Transformed::Expression(expr))
-                        }),
+                        },
+                        // Seed context is added to prevent the string literal from expanding into
+                        // a call to .to_string()
+                        Some(ExprContext::Seed)),
                     ),
                 ),
             )),

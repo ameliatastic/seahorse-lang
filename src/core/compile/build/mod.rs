@@ -1092,7 +1092,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
         );
 
         let mut tree = tree
-            .map_with_path(|(mut contexts, (mut signatures, namespace)), path| {
+            .map_with_path(|(mut contexts, (mut signatures, namespace)), abs| {
                 let mut artifact = Artifact {
                     features: BTreeSet::new(),
                     uses: vec![Use { rooted: true, tree: Tree::Node(HashMap::new()) }],
@@ -1104,7 +1104,15 @@ impl TryFrom<CheckOutput> for BuildOutput {
 
                 for (name, export) in namespace.into_iter() {
                     match export {
-                        Export::Import(Located(_, ImportObj::SymbolPath(mut path) | ImportObj::ModulePath(mut path) | ImportObj::PackagePath(mut path))) => {
+                        NamespacedObject::Automatic(..) => {},
+                        NamespacedObject::Import(Located(_, ImportObj { path, is_builtin: true, .. })) => {
+                            // For builtins that resolve to imports, check for features that need to
+                            // be made available
+                            if path.starts_with(&["sh".to_string(), "seahorse".to_string(), "pyth".to_string()]) {
+                                artifact.features.insert(Feature::Pyth);
+                            }
+                        }
+                        NamespacedObject::Import(Located(_, ImportObj { mut path, is_builtin: false, .. })) => {
                             let mut node = match1!(artifact.uses.get_mut(0), Some(Use { tree: Tree::Node(node), .. }) => node);
                             let last = path.pop().unwrap();
 
@@ -1125,7 +1133,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
 
                             node.insert(last, Tree::Leaf(None));
                         }
-                        Export::Item(item) => {
+                        NamespacedObject::Item(item) => {
                             match item {
                                 Item::Builtin(..) => {}
                                 Item::Defined(defined) => {
@@ -1237,6 +1245,7 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                 }
                             }
                         }
+                        _ => {}
                     }
                 }
 
@@ -1255,15 +1264,8 @@ impl TryFrom<CheckOutput> for BuildOutput {
                     }
                 }
 
-                // Prune all Seahorse builtins after checking for dependencies ("if pyth is
-                // accessible then add it to the feature set")
-                if
-                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "pyth".to_string()]).is_some() ||
-                    artifact.uses[0].tree.get(&vec!["sh".to_string(), "seahorse".to_string(), "self".to_string()]).is_some()
-                {
-                    artifact.features.insert(Feature::Pyth);
-                }
-                artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
+                // Prune all Seahorse builtins
+                // artifact.uses[0].tree.remove(&vec!["sh".to_string()]);
 
                 return Ok(artifact);
             })

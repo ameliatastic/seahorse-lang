@@ -858,20 +858,18 @@ impl<'a> Context<'a> {
             },
             Ty::Path(mut abs) => match self.sign_output.namespace_output.tree.get(&abs) {
                 Some(Tree::Leaf(namespace)) => match namespace.get(attr) {
-                    Some(Export::Import(import)) => match import {
-                        Located(_, ImportObj::SymbolPath(abs)) => {
+                    Some(NamespacedObject::Automatic(..)) => None,
+                    Some(NamespacedObject::Import(import)) => match import {
+                        Located(_, ImportObj { path, import_type: ImportType::Symbol, .. }) => {
                             let mut abs = abs.clone();
                             let attr = abs.pop().unwrap();
                             self.attr(Ty::Path(abs), &attr)
                         }
-                        Located(_, ImportObj::ModulePath(abs)) => {
-                            Some((Ty::Anonymous(0), Ty::Path(abs.clone())))
-                        }
-                        Located(_, ImportObj::PackagePath(abs)) => {
+                        Located(_, ImportObj { path, .. }) => {
                             Some((Ty::Anonymous(0), Ty::Path(abs.clone())))
                         }
                     },
-                    Some(Export::Item(..)) => {
+                    Some(NamespacedObject::Item(..)) => {
                         match self.sign_output.tree.get_leaf(&abs).unwrap().get(attr) {
                             // wow this got ugly
                             Some(Signature::Constant(expansion)) => {
@@ -1458,18 +1456,17 @@ impl<'a> Context<'a> {
                 }
                 self.unify(expr_ty, Ty::python(Python::Str, vec![]), loc)?
             }
-            // Three levels of checks for an `Id`:
+            // Two levels of checks for an `Id`:
             // 1. Check to see if a matching variable was declared locally
             // 2. Check to see if a matching name was imported/declared in the namespace
-            // 3. Check to see if a matching Python builtin exists
             ast::ExpressionObj::Id(var) => match self.find_var(var) {
                 Some(level) => {
                     let param_var = *self.scopes[level].get(var).unwrap();
                     self.unify(expr_ty, Ty::Param(param_var), loc)?
                 }
                 None => match self.namespace.get(var) {
-                    Some(Export::Import(Located(loc, import))) => match import {
-                        ImportObj::SymbolPath(path) => {
+                    Some(NamespacedObject::Import(Located(loc, import))) => match import {
+                        ImportObj { path, import_type: ImportType::Symbol, .. } => {
                             match self.sign_output.tree.get_leaf_ext(path) {
                                 Some(Signature::Constant(expansion)) => {
                                     let ty = self.check_constant(expr_ty.clone(), expansion)?;
@@ -1541,11 +1538,11 @@ impl<'a> Context<'a> {
                             }
                             // TODO get object signature, unify with type
                         }
-                        ImportObj::ModulePath(path) | ImportObj::PackagePath(path) => {
+                        ImportObj { path, .. } => {
                             self.unify(expr_ty, Ty::Path(path.clone()), loc)?
                         }
                     },
-                    Some(Export::Item(..)) => {
+                    Some(NamespacedObject::Automatic(..) | NamespacedObject::Item(..)) => {
                         let mut path = self.abs.clone();
                         path.push(var.clone());
 
@@ -1612,12 +1609,7 @@ impl<'a> Context<'a> {
                         }
                     }
                     None => {
-                        if let Some(builtin) = Python::get_by_name(&var) {
-                            let ty = self.deanonymize(builtin.ty());
-                            self.unify(expr_ty, ty, loc)?
-                        } else {
-                            return Err(Error::VarNotFound(var.clone()).core(loc));
-                        }
+                        return Err(Error::VarNotFound(var.clone()).core(loc));
                     }
                 },
             },
@@ -2230,7 +2222,7 @@ impl TryFrom<SignOutput> for CheckOutput {
 
                 for (_, def) in namespace.iter() {
                     match def {
-                        Export::Item(Item::Defined(Located(_, def))) => match def {
+                        NamespacedObject::Item(Item::Defined(Located(_, def))) => match def {
                             ast::TopLevelStatementObj::Constant { name, value } => {
                                 let output = Context::typecheck_constant(value, &sign_output, path)?;
                                 checked.insert(name.clone(), FinalContext::Constant(output));
