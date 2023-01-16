@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `sum` now works with floats (and also handles type errors properly)
+- Bug that caused compilation errors based on the order that modules were imported in
+
+### Changed
+
+- Import handling is different: `prelude` is now imported automatically, and objects imported from it are not re-exported
 
 ## [0.2.6]
 
