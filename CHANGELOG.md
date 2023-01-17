@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `sum` now works with floats (and also handles type errors properly)
 - Bug that caused compilation errors based on the order that modules were imported in
+- Error when using account key() as seed
 
 ### Changed
 
@@ -47,15 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where syntactic transformations would be duplicated in some arithmetic expressions
 - Make token mints and accounts mutable in instruction contexts
 
-### Fixed
-
-- Error when using account key() as seed
-
 ## [0.2.4]
 
 ### Added
 
 - Pyth integration
+
 ### Fixed
 
 - System clock is now immutable in instruction contexts (a.k.a. it works now)
