@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where syntactic transformations would be duplicated in some arithmetic expressions
 - Make token mints and accounts mutable in instruction contexts
 
+### Fixed
+
+- Error when using account key() as seed
+
 ## [0.2.4]
 
 ### Added
