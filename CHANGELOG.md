@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sum` now works with floats (and also handles type errors properly)
 - Bug that caused compilation errors based on the order that modules were imported in
 - Error when using account key() as seed
+- Bug caused by array/list indexing
 
 ### Changed
 
