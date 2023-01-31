@@ -1178,6 +1178,7 @@ impl BuiltinSource for Prelude {
 
     fn index(&self) -> Option<(Ty, Ty)> {
         match self {
+            // Array[T].__index__(i128) -> T
             Self::Array => Some((
                 Ty::prelude(Self::Array, vec![Ty::Anonymous(0), Ty::Anonymous(1)]),
                 Ty::new_function(
@@ -1190,11 +1191,14 @@ impl BuiltinSource for Prelude {
                         Ty::Anonymous(0).into(),
                         Transformation::new(|mut expr| {
                             let (value, mut index) = match1!(expr.obj, ExpressionObj::Index { value, index } => (*value, *index));
-                            let value_unwrapped =
-                                match1!(&value.obj, ExpressionObj::BorrowImmut(value) => &**value);
+                            let value_unwrapped = match &value.obj {
+                                ExpressionObj::BorrowImmut(value) => &**value,
+                                ExpressionObj::BorrowMut(value) => &**value,
+                                _ => panic!()
+                            };
 
                             index.obj = ExpressionObj::Rendered(quote! {
-                                #value_unwrapped.wrapped_index(#index)
+                                #value_unwrapped.wrapped_index(#index as i128)
                             });
 
                             expr.obj = ExpressionObj::Index {
