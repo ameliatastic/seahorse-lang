@@ -4,9 +4,9 @@ use crate::{
     core::compile::{ast::*, build::*, builtin::*},
     match1,
 };
-use std::collections::BTreeMap;
-use prelude::{NamespacedObject, Namespace};
+use prelude::{Namespace, NamespacedObject};
 use quote::quote;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Python {

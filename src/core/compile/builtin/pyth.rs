@@ -82,24 +82,25 @@ impl BuiltinSource for Pyth {
                     )],
                     Ty::Transformed(
                         Ty::pyth(Self::PriceFeed, vec![]).into(),
-                        Transformation::new_with_context(|mut expr, _| {
-                            let (function, product) = match1!(expr.obj, ExpressionObj::Call { function, args } => (*function, args.into_iter().next().unwrap()));
-                            let price = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
+                        Transformation::new_with_context(
+                            |mut expr, _| {
+                                let (function, product) = match1!(expr.obj, ExpressionObj::Call { function, args } => (*function, args.into_iter().next().unwrap()));
+                                let price = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
 
-                            let product = if let ExpressionObj::Literal(Literal::Str(product)) =
-                                product.obj
-                            {
-                                product
-                            } else {
-                                return Err(CoreError::make_raw(
-                                    "Price.validate() requires a string literal",
-                                    "",
-                                ));
-                            };
+                                let product = if let ExpressionObj::Literal(Literal::Str(product)) =
+                                    product.obj
+                                {
+                                    product
+                                } else {
+                                    return Err(CoreError::make_raw(
+                                        "Price.validate() requires a string literal",
+                                        "",
+                                    ));
+                                };
 
-                            let product_re =
-                                Regex::new(r"^((mainnet|devnet|testnet)-)?\w+/\w+$").unwrap();
-                            let caps = product_re
+                                let product_re =
+                                    Regex::new(r"^((mainnet|devnet|testnet)-)?\w+/\w+$").unwrap();
+                                let caps = product_re
                                 .captures(&product)
                                 .ok_or(CoreError::make_raw(
                                     "invalid Pyth product string",
@@ -117,38 +118,39 @@ impl BuiltinSource for Pyth {
                                     )
                                 ))?;
 
-                            let product = match caps.get(1) {
-                                Some(_) => product,
-                                None => format!("mainnet-{}", product.as_str()),
-                            };
+                                let product = match caps.get(1) {
+                                    Some(_) => product,
+                                    None => format!("mainnet-{}", product.as_str()),
+                                };
 
-                            let key = get_pyth_price_address(&product)
-                                .ok_or(CoreError::make_raw(
-                                    "could not find price account for product",
-                                    "",
-                                ))?
-                                .from_base58()
-                                .unwrap();
+                                let key = get_pyth_price_address(&product)
+                                    .ok_or(CoreError::make_raw(
+                                        "could not find price account for product",
+                                        "",
+                                    ))?
+                                    .from_base58()
+                                    .unwrap();
 
-                            let msg = format!(
-                                "Pyth PriceAccount validation failed: expected {}",
-                                product
-                            );
+                                let msg = format!(
+                                    "Pyth PriceAccount validation failed: expected {}",
+                                    product
+                                );
 
-                            expr.obj = ExpressionObj::Rendered(quote! {
-                                {
-                                    if #price.key() != Pubkey::new_from_array([#(#key),*]) {
-                                        panic!(#msg)
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    {
+                                        if #price.key() != Pubkey::new_from_array([#(#key),*]) {
+                                            panic!(#msg)
+                                        }
+                                        load_price_feed_from_account_info(&#price).unwrap()
                                     }
-                                    load_price_feed_from_account_info(&#price).unwrap()
-                                }
-                            });
+                                });
 
-                            Ok(Transformed::Expression(expr))
-                        },
-                        // Seed context is added to prevent the string literal from expanding into
-                        // a call to .to_string()
-                        Some(ExprContext::Seed)),
+                                Ok(Transformed::Expression(expr))
+                            },
+                            // Seed context is added to prevent the string literal from expanding into
+                            // a call to .to_string()
+                            Some(ExprContext::Seed),
+                        ),
                     ),
                 ),
             )),

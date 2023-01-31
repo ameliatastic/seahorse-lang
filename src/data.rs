@@ -1,7 +1,7 @@
 macro_rules! map_const {
     ($name:ident, $path:literal) => {
         pub const $name: &'static str = include_str!(concat!("../data/const/", $path));
-    }
+    };
 }
 
 // Text data (see /data/const), included as string constants.

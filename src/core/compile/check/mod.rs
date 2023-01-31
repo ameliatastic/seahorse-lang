@@ -820,8 +820,8 @@ impl<'a> Context<'a> {
                                                 value: value.into(),
                                                 name: String::from("__account__"),
                                             };
-                                            let value = ExpressionObj::Call { 
-                                                function: ExpressionObj::Attribute { 
+                                            let value = ExpressionObj::Call {
+                                                function: ExpressionObj::Attribute {
                                                     value: value.into(),
                                                     name: "key".to_string(),
                                                 }.into(),

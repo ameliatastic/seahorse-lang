@@ -1,6 +1,10 @@
 use owo_colors::OwoColorize;
 use rustpython_parser::ast::Location as SrcLocation;
-use std::{collections::{HashMap, BTreeMap}, error, fmt, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    error, fmt,
+    rc::Rc,
+};
 
 /// Match and extract against a single pattern, panicking if no match.
 #[macro_export]

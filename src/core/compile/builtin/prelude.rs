@@ -1194,7 +1194,7 @@ impl BuiltinSource for Prelude {
                             let value_unwrapped = match &value.obj {
                                 ExpressionObj::BorrowImmut(value) => &**value,
                                 ExpressionObj::BorrowMut(value) => &**value,
-                                _ => panic!()
+                                _ => panic!(),
                             };
 
                             index.obj = ExpressionObj::Rendered(quote! {

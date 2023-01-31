@@ -222,7 +222,8 @@ impl TryFrom<NamespaceOutput> for SignOutput {
                             let signature = build_signature(def, abs, &namespace_output.tree)?;
                             signatures.insert(name.clone(), signature);
                         }
-                        NamespacedObject::Automatic(builtin) | NamespacedObject::Item(Item::Builtin(builtin)) => {
+                        NamespacedObject::Automatic(builtin)
+                        | NamespacedObject::Item(Item::Builtin(builtin)) => {
                             signatures.insert(builtin.name(), Signature::Builtin(builtin.clone()));
                         }
                         _ => {}

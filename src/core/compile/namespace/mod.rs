@@ -1,6 +1,5 @@
 // TODO just throwing everything into mod.rs for now, don't want to deal with keeping things clean
 // yet
-use crate::match1;
 use crate::core::{
     clean::ast as ca,
     compile::builtin::*,
@@ -8,6 +7,7 @@ use crate::core::{
     preprocess::{self as pre, Module},
     util::*,
 };
+use crate::match1;
 use std::collections::{BTreeMap, VecDeque};
 
 enum Error {
@@ -145,12 +145,10 @@ impl Tree<Namespace> {
                         rel.push_front(abs.pop().unwrap());
                         self._advance_path(rel, &abs)
                     }
-                    ImportType::Module | ImportType::Package => {
-                        match self.get(&import.path) {
-                            Some(..) => self._advance_path(rel, &import.path),
-                            None => None,
-                        }
-                    }
+                    ImportType::Module | ImportType::Package => match self.get(&import.path) {
+                        Some(..) => self._advance_path(rel, &import.path),
+                        None => None,
+                    },
                 },
                 None => None,
             },
@@ -182,14 +180,14 @@ pub type Import = Located<ImportObj>;
 pub struct ImportObj {
     pub path: Vec<String>,
     pub import_type: ImportType,
-    pub is_builtin: bool
+    pub is_builtin: bool,
 }
 
 #[derive(Clone, Debug)]
 pub enum ImportType {
     Symbol,
     Module,
-    Package
+    Package,
 }
 
 #[derive(Clone, Debug)]
@@ -248,7 +246,9 @@ impl Tree<Namespace> {
                             match self.get_leaf_ext(&path).unwrap() {
                                 NamespacedObject::Automatic(builtin) => {
                                     if !path.starts_with(&abs) {
-                                        Err(Error::AutomaticImportsNotExported(path).core().located(loc.clone()))
+                                        Err(Error::AutomaticImportsNotExported(path)
+                                            .core()
+                                            .located(loc.clone()))
                                     } else {
                                         Ok(TyName::Builtin(builtin.clone()))
                                     }
@@ -271,7 +271,7 @@ impl Tree<Namespace> {
 
                                     Ok(TyName::Builtin(builtin.clone()))
                                 }
-                                _ => panic!()
+                                _ => panic!(),
                             }
                         } else {
                             Err(Error::NoSuchSymbol(base.clone())
@@ -388,7 +388,8 @@ fn build_python_namespace(
                     if symbol.as_str() == "*" {
                         let glob = match wip.get(&abs).unwrap() {
                             Tree::Leaf(Wip::Done(namespace)) => {
-                                namespace.iter()
+                                namespace
+                                    .iter()
                                     .filter_map(|(name, object)| {
                                         // Filter out the automatic imports
                                         if let NamespacedObject::Automatic(..) = object {
@@ -406,8 +407,10 @@ fn build_python_namespace(
                         for symbol in glob.into_iter() {
                             let obj = get_import_obj(wip, &abs, Some(symbol))
                                 .map_err(|err| err.located(loc.clone()))?;
-                            namespace
-                                .insert(symbol.clone(), NamespacedObject::Import(Located(loc.clone(), obj)));
+                            namespace.insert(
+                                symbol.clone(),
+                                NamespacedObject::Import(Located(loc.clone(), obj)),
+                            );
                         }
                     } else {
                         let obj = get_import_obj(wip, &abs, Some(symbol))
@@ -420,7 +423,8 @@ fn build_python_namespace(
             ca::TopLevelStatementObj::Constant { name, .. }
             | ca::TopLevelStatementObj::ClassDef { name, .. }
             | ca::TopLevelStatementObj::FunctionDef(ca::FunctionDef { name, .. }) => {
-                let export = NamespacedObject::Item(Item::Defined(Located(loc.clone(), obj.clone())));
+                let export =
+                    NamespacedObject::Item(Item::Defined(Located(loc.clone(), obj.clone())));
                 namespace.insert(name.clone(), export);
             }
             ca::TopLevelStatementObj::Expression(..) => {}
@@ -444,8 +448,13 @@ fn get_import_obj(
                 if let Some(object) = namespace.get(symbol) {
                     let is_builtin = match object {
                         NamespacedObject::Item(Item::Defined(..)) => false,
-                        NamespacedObject::Import(Located(_, ImportObj { is_builtin: false, .. })) => false,
-                        _ => true
+                        NamespacedObject::Import(Located(
+                            _,
+                            ImportObj {
+                                is_builtin: false, ..
+                            },
+                        )) => false,
+                        _ => true,
                     };
 
                     let mut path = path.clone();
@@ -453,7 +462,7 @@ fn get_import_obj(
                     Ok(ImportObj {
                         path,
                         import_type: ImportType::Symbol,
-                        is_builtin
+                        is_builtin,
                     })
                 } else {
                     Err(Error::SymbolNotFound(symbol.clone()).core())
@@ -462,39 +471,37 @@ fn get_import_obj(
             None => Ok(ImportObj {
                 path: path.clone(),
                 import_type: ImportType::Module,
-                is_builtin: path.starts_with(&["sh".to_string()])
+                is_builtin: path.starts_with(&["sh".to_string()]),
             }),
         },
         Tree::Node(package) => match symbol {
-            Some(symbol) => {
-                match package.get(symbol) {
-                    Some(Tree::Leaf(..)) => {
-                        let mut path = path.clone();
-                        path.push(symbol.clone());
-                        let is_builtin = path.starts_with(&["sh".to_string()]);
-                        Ok(ImportObj {
-                            path: path,
-                            import_type: ImportType::Module,
-                            is_builtin
-                        })
-                    }
-                    Some(Tree::Node(..)) => {
-                        let mut path = path.clone();
-                        path.push(symbol.clone());
-                        let is_builtin = path.starts_with(&["sh".to_string()]);
-                        Ok(ImportObj {
-                            path: path,
-                            import_type: ImportType::Package,
-                            is_builtin
-                        })
-                    }
-                    None => Err(Error::SymbolNotFound(symbol.clone()).core())
+            Some(symbol) => match package.get(symbol) {
+                Some(Tree::Leaf(..)) => {
+                    let mut path = path.clone();
+                    path.push(symbol.clone());
+                    let is_builtin = path.starts_with(&["sh".to_string()]);
+                    Ok(ImportObj {
+                        path: path,
+                        import_type: ImportType::Module,
+                        is_builtin,
+                    })
                 }
+                Some(Tree::Node(..)) => {
+                    let mut path = path.clone();
+                    path.push(symbol.clone());
+                    let is_builtin = path.starts_with(&["sh".to_string()]);
+                    Ok(ImportObj {
+                        path: path,
+                        import_type: ImportType::Package,
+                        is_builtin,
+                    })
+                }
+                None => Err(Error::SymbolNotFound(symbol.clone()).core()),
             },
             None => Ok(ImportObj {
                 path: path.clone(),
                 import_type: ImportType::Package,
-                is_builtin: path.starts_with(&["sh".to_string()])
+                is_builtin: path.starts_with(&["sh".to_string()]),
             }),
         },
         _ => panic!(),
