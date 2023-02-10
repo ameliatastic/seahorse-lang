@@ -166,7 +166,7 @@ impl BuiltinSource for Pyth {
                             let price = match1!(function.obj, ExpressionObj::Attribute { value, .. } => *value);
 
                             expr.obj = ExpressionObj::Rendered(quote! {
-                                #price.get_current_price().unwrap()
+                                #price.get_price_unchecked()
                             });
 
                             Ok(Transformed::Expression(expr))
@@ -188,6 +188,11 @@ impl BuiltinSource for Pyth {
             (Self::Price, "expo") => Some((
                 ty_no_params,
                 Ty::prelude(Prelude::RustInt(true, 32), vec![]),
+            )),
+            // Price.publish_time: i64
+            (Self::Price, "publish_time") => Some((
+                ty_no_params,
+                Ty::prelude(Prelude::RustInt(true, 64), vec![]),
             )),
             // Price.num() -> f64
             (Self::Price, "num") => Some((
