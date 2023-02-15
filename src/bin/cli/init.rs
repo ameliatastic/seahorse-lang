@@ -209,7 +209,7 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             let mut pyth = InlineTable::new();
             pyth.insert(
                 "version",
-                Value::String(Formatted::new("0.7.0".to_string())),
+                Value::String(Formatted::new("0.7.1".to_string())),
             );
             pyth.insert("optional", Value::Boolean(Formatted::new(true)));
             cargo["dependencies"]["pyth-sdk-solana"] = Item::Value(Value::InlineTable(pyth));
