@@ -1116,7 +1116,7 @@ impl ToTokens for UnaryOperator {
             Self::Pos => quote! { + },
             Self::Neg => quote! { - },
             Self::Not => quote! { ! },
-            Self::Inv => quote! { ~ },
+            Self::Inv => quote! { ! },
         })
     }
 }
