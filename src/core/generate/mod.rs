@@ -646,8 +646,8 @@ impl<'a> ToTokens for StoredTyExpr<'a> {
                 quote! { #path #params }
             }
             TyExpr::Array { element, size } => {
-                let element = LoadedTyExpr(element.as_ref());
-                let size = LoadedTyExpr(size.as_ref());
+                let element = StoredTyExpr(element.as_ref());
+                let size = StoredTyExpr(size.as_ref());
 
                 quote! { [#element; #size] }
             },
