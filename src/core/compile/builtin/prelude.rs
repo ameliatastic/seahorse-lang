@@ -1,6 +1,6 @@
 //! The Seahorse Prelude includes a bunch of builtin types that convert to Rust/Anchor.
 
-use crate::core::compile::builtin::*;
+use crate::core::{compile::builtin::*, generate::LoadedTyExpr};
 pub use crate::core::{
     compile::{ast::*, build::*, check::*, namespace::*, sign::*},
     util::*,
@@ -140,10 +140,12 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", Ty::prelude(self.clone(), vec![]))],
                                     params: vec![],
+                                    is_loadable: false
                                 };
 
                                 Transformation::new(move |mut expr| {
                                     let x = match1!(expr.obj, ExpressionObj::Call { args, .. } => args.into_iter().next().unwrap());
+                                    let ty = LoadedTyExpr(&ty);
 
                                     expr.obj = ExpressionObj::Rendered(quote! {
                                         <#ty as TryFrom<_>>::try_from(#x).unwrap()
@@ -1285,6 +1287,7 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", expr.ty)],
                                     params: vec![],
+                                    is_loadable: false
                                 },
                                 value: expr.obj.into(),
                             };
@@ -1302,6 +1305,7 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", expr.ty)],
                                     params: vec![],
+                                    is_loadable: false
                                 },
                                 value: expr.obj.into(),
                             };

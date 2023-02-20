@@ -222,24 +222,28 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                         mutability,
                         name: vec!["Vec".to_string()],
                         params,
+                        is_loadable: false
                     },
                     // str -> String
                     Builtin::Python(Python::Str) => TyExpr::Generic {
                         mutability,
                         name: vec!["String".to_string()],
                         params,
+                        is_loadable: false
                     },
                     // Empty[T] -> Empty<T>
                     Builtin::Prelude(Prelude::Empty) => TyExpr::Generic {
                         mutability: Mutability::Immutable,
                         name: vec!["Empty".to_string()],
                         params,
+                        is_loadable: false
                     },
                     // Signer -> SeahorseSigner<'entrypoint, 'info>
                     Builtin::Prelude(Prelude::Signer) => TyExpr::Generic {
                         mutability: Mutability::Immutable,
                         name: vec!["SeahorseSigner".to_string()],
                         params: vec![TyExpr::InfoLifetime, TyExpr::AnonLifetime],
+                        is_loadable: false
                     },
                     // TokenMint -> SeahorseAccount<'entrypoint, 'info, Mint>>
                     Builtin::Prelude(Prelude::TokenMint) => TyExpr::Generic {
@@ -250,6 +254,7 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                             TyExpr::AnonLifetime,
                             TyExpr::new_specific(vec!["Mint"], Mutability::Immutable),
                         ],
+                        is_loadable: false
                     },
                     // TokenAccount -> SeahorseAccount<'entrypoint, 'info, TokenAccount>>
                     Builtin::Prelude(Prelude::TokenAccount) => TyExpr::Generic {
@@ -260,6 +265,7 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                             TyExpr::AnonLifetime,
                             TyExpr::new_specific(vec!["TokenAccount"], Mutability::Immutable),
                         ],
+                        is_loadable: false
                     },
                     // Program, UncheckedAccount, pyth.PriceAccount -> UncheckedAccount<'info>
                     Builtin::Prelude(Prelude::Program | Prelude::UncheckedAccount)
@@ -267,6 +273,7 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                         mutability: Mutability::Immutable,
                         name: vec!["UncheckedAccount".to_string()],
                         params: vec![TyExpr::InfoLifetime],
+                        is_loadable: false
                     },
                     // Clock -> Sysvar<'info, Clock>
                     Builtin::Prelude(Prelude::Clock) => TyExpr::Generic {
@@ -276,21 +283,33 @@ fn make_ty_expr(ty_expr: ast::TyExpression, ty: Ty) -> TyExpr {
                             TyExpr::InfoLifetime,
                             TyExpr::new_specific(vec!["Clock"], Mutability::Immutable),
                         ],
+                        is_loadable: false
                     },
                     // Everything else
                     builtin => TyExpr::Generic {
                         mutability,
                         name: vec![builtin.name()],
                         params,
+                        is_loadable: false
                     },
                 },
                 TyName::Defined(
                     _,
-                    DefinedType::Struct | DefinedType::Enum | DefinedType::Event,
+                    DefinedType::Struct,
                 ) => TyExpr::Generic {
                     mutability,
                     name: base,
                     params,
+                    is_loadable: true
+                },
+                TyName::Defined(
+                    _,
+                    DefinedType::Enum | DefinedType::Event,
+                ) => TyExpr::Generic {
+                    mutability,
+                    name: base,
+                    params,
+                    is_loadable: false
                 },
                 TyName::Defined(_, DefinedType::Account) => TyExpr::Account(base),
             }
