@@ -207,6 +207,15 @@ fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 #expr.borrow().clone().into_iter().map(|element| #inner).collect()
             }
         }
+        // TODO hack to get strings working with accounts
+        // Not sure if the assumption made in this function should be "expr is assumed to be owned"
+        // or "expr is assumed to be borrowed," since cloning to assert ownership is safer but might
+        // be needlessly expensive
+        TyExpr::Generic { name, .. } if name == &["String"] => {
+            quote! {
+                #expr.clone()
+            }
+        }
         TyExpr::Generic { is_loadable, mutability, .. } => {
             let inner = match mutability {
                 Mutability::Immutable => expr,
