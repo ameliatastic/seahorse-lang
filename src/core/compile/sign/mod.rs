@@ -138,8 +138,9 @@ impl StructSignature {
                         Transformation::new(|mut expr| {
                             let (class, args) = match1!(expr.obj, ExpressionObj::Call { function, args } => (function, args));
 
+                            // The __new__ function is defined on the loaded type
                             expr.obj = ExpressionObj::Rendered(quote! {
-                                #class::__new__(#(#args),*)
+                                <Loaded!(#class)>::__new__(#(#args),*)
                             });
 
                             Ok(Transformed::Expression(expr))
