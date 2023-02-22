@@ -1120,6 +1120,15 @@ impl TryFrom<CheckOutput> for BuildOutput {
                             }
                         }
                         NamespacedObject::Import(Located(_, ImportObj { mut path, is_builtin: false, .. })) => {
+                            let is_account = if let Some(signature) = check_output.sign_output.tree.get_leaf_ext(&path) {
+                                match signature {
+                                    Signature::Class(ClassSignature::Struct(StructSignature { is_account: true, .. })) => true,
+                                    _ => false
+                                }
+                            } else {
+                                false
+                            };
+
                             let mut node = match1!(artifact.uses.get_mut(0), Some(Use { tree: Tree::Node(node), .. }) => node);
                             let last = path.pop().unwrap();
 
@@ -1138,6 +1147,9 @@ impl TryFrom<CheckOutput> for BuildOutput {
                                 node = match1!(node.get_mut(&part), Some(Tree::Node(node)) => node);
                             }
 
+                            if is_account {
+                                node.insert(format!("Loaded{}", last), Tree::Leaf(None));
+                            }
                             node.insert(last, Tree::Leaf(None));
                         }
                         NamespacedObject::Item(item) => {
