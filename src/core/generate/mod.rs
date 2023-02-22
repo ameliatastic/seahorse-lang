@@ -336,19 +336,23 @@ impl ToTokens for Struct {
         let event_emit_fn = if *is_event {
             let fs = fields.iter().map(|(name, ty, original_ty)| {
                 let name = ident(name);
-                let needs_clone = !original_ty.is_copy();
 
-                if needs_clone {
-                    quote! { #name: e.#name.clone() }
+                let needs_clone = !original_ty.is_copy();
+                let field = if needs_clone {
+                    quote! { e.#name.clone() }
                 } else {
-                    quote! { #name: e.#name }
-                }
+                    quote! { e.#name }
+                };
+
+                let field = stored_field(quote! { #field }, ty);
+
+                quote! { #name: #field }
             });
 
             Some(quote! {
                 fn __emit__(&self) {
                     let e = self.borrow();
-                    emit!(#name { #(#fs),* })
+                    emit!(#stored_name { #(#fs),* })
                 }
             })
         } else {
@@ -371,18 +375,13 @@ impl ToTokens for Struct {
             None
         };
 
-        let stored_macros = quote! { #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)] };
-
-        let macros = if *is_event {
-            quote! {
-                #[event]
-                #[derive(Clone, Debug, Default)]
-            }
+        let stored_macros = if *is_event {
+            quote! { #[event] }
         } else {
-            quote! {
-                #[derive(Clone, Debug, Default)]
-            }
+            quote! { #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)] }
         };
+
+        let macros = quote! { #[derive(Clone, Debug, Default)] };
 
         let stored_fields = fields.iter().map(|(name, ty, _)| {
             let name = ident(name);
