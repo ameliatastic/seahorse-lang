@@ -638,21 +638,17 @@ impl BuiltinSource for Python {
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
                         Transformation::new(|mut expr| {
-                            let (value, mut index) = match1!(expr.obj, ExpressionObj::Index { value, index } => (*value, *index));
-                            let value_unwrapped = match &value.obj {
-                                ExpressionObj::BorrowImmut(value) => &**value,
-                                ExpressionObj::BorrowMut(value) => &**value,
-                                _ => panic!()
-                            };
-
-                            index.obj = ExpressionObj::Rendered(quote! {
-                                #value_unwrapped.wrapped_index(#index as i128)
-                            });
-
-                            expr.obj = ExpressionObj::Index {
-                                value: value.into(),
-                                index: index.into()
-                            };
+                            let (value, index) = match1!(expr.obj, ExpressionObj::Index { value, index } => (*value, *index));
+                            
+                            if let ExpressionObj::BorrowMut(..) = &value.obj {
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    (*#value.index_wrapped_mut(#index.into()))
+                                });
+                            } else {
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    (*#value.index_wrapped(#index.into()))
+                                });
+                            }
 
                             Ok(Transformed::Expression(expr))
                         })

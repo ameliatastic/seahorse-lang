@@ -487,21 +487,9 @@ impl Context {
                             self.build_expression(target, vec![ExprContext::LVal].into())?;
                         let rval = self.build_expression(value, vec![].into())?;
 
-                        if let TypedExpression {
-                            obj: ExpressionObj::Index { value, index },
-                            ..
-                        } = receiver
-                        {
-                            Statement::IndexAssign {
-                                receiver: *value,
-                                index: *index,
-                                value: rval,
-                            }
-                        } else {
-                            Statement::Assign {
-                                receiver,
-                                value: rval,
-                            }
+                        Statement::Assign {
+                            receiver,
+                            value: rval,
                         }
                     }
                     Assign::Declare { undeclared, target } => Statement::Let {

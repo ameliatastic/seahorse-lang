@@ -1041,18 +1041,6 @@ impl ToTokens for Statement {
                     assign!(#receiver, #value);
                 }
             }
-            Self::IndexAssign {
-                receiver,
-                index,
-                value,
-            } => {
-                let index = Grouped(index);
-                let value = Grouped(value);
-
-                quote! {
-                    index_assign!(#receiver, #index, #value);
-                }
-            }
             Self::Expression(expression) => {
                 let expression = Grouped(expression);
 
@@ -1479,7 +1467,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
         // Utility structs, functions, and macros to beautify the generated code a little.
         pub mod seahorse_util {
             use super::*;
-            use std::{collections::HashMap, fmt::Debug, ops::Deref};
+            use std::{collections::HashMap, fmt::Debug, ops::{Deref, Index, IndexMut}};
             // Re-export for ease of access
             #[cfg(feature = "pyth-sdk-solana")]
             pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
@@ -1520,25 +1508,65 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             }
 
             // Pythonic indexing for vec/array types (Seahorse List, Array types)
-            impl<T: Clone> Mutable<Vec<T>> {
-                pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index >= 0 {
-                        return index.try_into().unwrap();
+            pub trait IndexWrapped {
+                type Output;
+                
+                fn index_wrapped(&self, index: i128) -> &Self::Output;
+            }
+
+            pub trait IndexWrappedMut: IndexWrapped {
+                fn index_wrapped_mut(&mut self, index: i128) -> &mut <Self as IndexWrapped>::Output;
+            }
+
+            impl<T> IndexWrapped for Vec<T> {
+                type Output = T;
+
+                fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+                    if index < 0 {
+                        index += self.len() as i128;
                     }
 
-                    index += self.borrow().len() as i128;
-                    return index.try_into().unwrap();
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index(index)
                 }
             }
 
-            impl<T: Clone, const N: usize> Mutable<[T; N]> {
-                pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index >= 0 {
-                        return index.try_into().unwrap();
+            impl<T> IndexWrappedMut for Vec<T> {
+                fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+                    if index < 0 {
+                        index += self.len() as i128;
                     }
 
-                    index += self.borrow().len() as i128;
-                    return index.try_into().unwrap();
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index_mut(index)
+                }
+            }
+
+            impl<T, const N: usize> IndexWrapped for [T; N] {
+                type Output = T;
+
+                fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+                    if index < 0 {
+                        index += N as i128;
+                    }
+
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index(index)
+                }
+            }
+
+            impl<T, const N: usize> IndexWrappedMut for [T; N] {
+                fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+                    if index < 0 {
+                        index += N as i128;
+                    }
+
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index_mut(index)
                 }
             }
 
