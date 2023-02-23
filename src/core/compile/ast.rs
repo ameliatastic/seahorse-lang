@@ -420,19 +420,6 @@ impl ExpressionObj {
         }
     }
 
-    /// Return whether this expression is the last in a chain of borrowable
-    /// expressions. Only attributes (fields, not method functions) and index
-    /// operations (regular, not tuple indexing) may get turned into borrows.
-    /// 
-    /// This method is needed because when adding borrows to an expression tree
-    /// in the context of an lval, we need to make sure that only one BorrowMut
-    /// is added.
-    // pub fn is_last_borrowable(&self) -> bool {
-    //     match self {
-    //         Self::Attribute { value } if !value.ty.is
-    //     }
-    // }
-
     pub fn without_borrows(self) -> Self {
         match self {
             Self::BinOp { left, op, right } => Self::BinOp {
