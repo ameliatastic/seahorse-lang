@@ -106,9 +106,6 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 pub mod seahorse_util {
     use super::*;
-
-    #[cfg(feature = "pyth-sdk-solana")]
-    pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
     use std::{
         collections::HashMap,
         fmt::Debug,
