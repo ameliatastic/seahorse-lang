@@ -164,15 +164,19 @@ fn loaded_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 Mutable::new(#expr.into_iter().map(|element| #inner).collect())
             }
         }
-        TyExpr::Generic { is_loadable, mutability, .. } => {
+        TyExpr::Generic {
+            is_loadable,
+            mutability,
+            ..
+        } => {
             let inner = match is_loadable {
                 false => quote! { #expr },
-                true => quote! { #ty_expr::load(#expr) }
+                true => quote! { #ty_expr::load(#expr) },
             };
 
             match mutability {
                 Mutability::Immutable => inner,
-                Mutability::Mutable => quote! { Mutable::new(#inner) }
+                Mutability::Mutable => quote! { Mutable::new(#inner) },
             }
         }
         TyExpr::Array { element, .. } => {
@@ -181,9 +185,10 @@ fn loaded_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
             quote! { Mutable::new(#expr.map(|element| #inner)) }
         }
         TyExpr::Tuple(tuple) => {
-            let inner = tuple.iter().enumerate().map(|(index, ty)| {
-                loaded_field(quote! { tuple.#index }, ty)
-            });
+            let inner = tuple
+                .iter()
+                .enumerate()
+                .map(|(index, ty)| loaded_field(quote! { tuple.#index }, ty));
 
             quote! {
                 {
@@ -192,7 +197,7 @@ fn loaded_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 }
             }
         }
-        _ => todo!()
+        _ => todo!(),
     }
 }
 
@@ -207,15 +212,19 @@ fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 #expr.borrow().clone().into_iter().map(|element| #inner).collect()
             }
         }
-        TyExpr::Generic { is_loadable, mutability, .. } => {
+        TyExpr::Generic {
+            is_loadable,
+            mutability,
+            ..
+        } => {
             let inner = match mutability {
                 Mutability::Immutable => expr,
-                Mutability::Mutable => quote! { #expr.borrow().clone() }
+                Mutability::Mutable => quote! { #expr.borrow().clone() },
             };
 
             match is_loadable {
                 false => inner,
-                true => quote! { #ty_expr::store(#inner) }
+                true => quote! { #ty_expr::store(#inner) },
             }
         }
         TyExpr::Array { element, .. } => {
@@ -226,9 +235,10 @@ fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
             }
         }
         TyExpr::Tuple(tuple) => {
-            let inner = tuple.iter().enumerate().map(|(index, ty)| {
-                stored_field(quote! { tuple.#index }, ty)
-            });
+            let inner = tuple
+                .iter()
+                .enumerate()
+                .map(|(index, ty)| stored_field(quote! { tuple.#index }, ty));
 
             quote! {
                 {
@@ -237,7 +247,7 @@ fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 }
             }
         }
-        _ => todo!()
+        _ => todo!(),
     }
 }
 
@@ -581,7 +591,7 @@ impl ToTokens for Enum {
 }
 
 /// Newtype to display the "loaded" (used at runtime) type of a type expression.
-/// 
+///
 /// Note that there isn't a `ToTokens` implementation for `TyExpr` itself - you
 /// need to choose either `LoadedTyExpr` or `StoredTyExpr` for context.
 pub struct LoadedTyExpr<'a>(pub &'a TyExpr);
@@ -589,7 +599,12 @@ impl<'a> ToTokens for LoadedTyExpr<'a> {
     // Mutability is relevant in this context and defined types need to be their Loaded- counterpart
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.0 {
-            TyExpr::Generic { name, params, mutability, is_loadable } => {
+            TyExpr::Generic {
+                name,
+                params,
+                mutability,
+                is_loadable,
+            } => {
                 let path = StaticPath(name);
                 let params = match params.len() {
                     0 => quote! {},
@@ -597,7 +612,7 @@ impl<'a> ToTokens for LoadedTyExpr<'a> {
                         let params = params.iter().map(|param| LoadedTyExpr(param));
 
                         quote! { <#(#params),*> }
-                    },
+                    }
                 };
 
                 let inner = if *is_loadable {
@@ -608,7 +623,7 @@ impl<'a> ToTokens for LoadedTyExpr<'a> {
 
                 match mutability {
                     Mutability::Immutable => inner,
-                    Mutability::Mutable => quote! { Mutable<#inner> }
+                    Mutability::Mutable => quote! { Mutable<#inner> },
                 }
             }
             TyExpr::Array { element, size } => {
@@ -616,12 +631,12 @@ impl<'a> ToTokens for LoadedTyExpr<'a> {
                 let size = LoadedTyExpr(size.as_ref());
 
                 quote! { Mutable<[#element; #size]> }
-            },
+            }
             TyExpr::Tuple(tuple) => {
                 let tuple = tuple.iter().map(|element| LoadedTyExpr(element));
 
                 quote! { (#(#tuple),*) }
-            },
+            }
             TyExpr::Account(path) => {
                 let mut path = path.clone();
                 *path.last_mut().unwrap() = format!("Loaded{}", path.last().unwrap());
@@ -654,7 +669,7 @@ impl<'a> ToTokens for StoredTyExpr<'a> {
                         let params = params.iter().map(|param| StoredTyExpr(param));
 
                         quote! { <#(#params),*> }
-                    },
+                    }
                 };
 
                 quote! { #path #params }
@@ -664,12 +679,12 @@ impl<'a> ToTokens for StoredTyExpr<'a> {
                 let size = StoredTyExpr(size.as_ref());
 
                 quote! { [#element; #size] }
-            },
+            }
             TyExpr::Tuple(tuple) => {
                 let tuple = tuple.iter().map(|element| LoadedTyExpr(element));
 
                 quote! { (#(#tuple),*) }
-            },
+            }
             TyExpr::Account(path) => {
                 let path = StaticPath(&path);
 
@@ -755,10 +770,10 @@ impl<'a> ToTokens for InstanceMethod<'a> {
             .chain(params.iter().map(|(name, ty)| {
                 let name = ident(name);
                 let ty = LoadedTyExpr(ty);
-    
+
                 quote! { mut #name: #ty }
             }));
-    
+
         let returns = LoadedTyExpr(returns);
 
         tokens.extend(quote! {
@@ -1138,7 +1153,7 @@ impl<'a> ToTokens for Grouped<'a> {
                 let ty = LoadedTyExpr(ty);
 
                 quote! { #value as #ty }
-            },
+            }
             obj => quote! { #obj },
         });
     }
@@ -1186,7 +1201,7 @@ impl ToTokens for ExpressionObj {
                 let ty = LoadedTyExpr(ty);
 
                 quote! { (#value as #ty) }
-            },
+            }
             Self::Vec(elements) => {
                 let elements = elements.iter().map(|element| Grouped(element));
 
@@ -1285,7 +1300,12 @@ impl ToTokens for UnaryOperator {
     }
 }
 
-fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CResult<String> {
+fn make_lib(
+    origin: &Artifact,
+    path: &Vec<String>,
+    program_name: &String,
+    features: &BTreeSet<Feature>,
+) -> CResult<String> {
     let program_name = ident(program_name);
 
     let mut id = None;
@@ -1457,6 +1477,15 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
 
     let path = StaticPath(path);
 
+    let maybe_pyth_import = if (features.contains(&Feature::Pyth)) {
+        Some(quote! {
+            // Re-export for ease of access
+            pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
+        })
+    } else {
+        None
+    };
+
     let text = beautify(quote! {
         use std::{cell::RefCell, rc::Rc};
         use anchor_lang::prelude::*;
@@ -1473,9 +1502,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
         pub mod seahorse_util {
             use super::*;
             use std::{collections::HashMap, fmt::Debug, ops::{Deref, Index, IndexMut}};
-            // Re-export for ease of access
-            #[cfg(feature = "pyth-sdk-solana")]
-            pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
+            #maybe_pyth_import
 
             // A "Python mutable" object.
             pub struct Mutable<T>(Rc<RefCell<T>>);
@@ -1515,7 +1542,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             // Pythonic indexing for vec/array types (Seahorse List, Array types)
             pub trait IndexWrapped {
                 type Output;
-                
+
                 fn index_wrapped(&self, index: i128) -> &Self::Output;
             }
 
@@ -1813,8 +1840,8 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
     type Error = CoreError;
 
     fn try_from((build_output, program_name): (BuildOutput, String)) -> CResult<Self> {
-        let origin = build_output.tree.get_leaf(&build_output.origin).unwrap();
-        let lib = make_lib(origin, &build_output.origin, &program_name)?;
+        let tree = build_output.tree.clone();
+        let origin = tree.get_leaf(&build_output.origin).unwrap();
 
         let features = Rc::new(RefCell::new(BTreeSet::new()));
 
@@ -1828,6 +1855,9 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
                 Ok(text)
             })
             .transpose()?;
+
+        let features = features.take();
+        let lib = make_lib(origin, &build_output.origin, &program_name, &features)?;
 
         add_mods(&mut tree);
 
@@ -1849,10 +1879,7 @@ impl TryFrom<(BuildOutput, String)> for GenerateOutput {
             );
         }
 
-        return Ok(GenerateOutput {
-            tree,
-            features: features.take(),
-        });
+        return Ok(GenerateOutput { tree, features });
     }
 }
 
