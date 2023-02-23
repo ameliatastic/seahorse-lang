@@ -152,6 +152,95 @@ impl ToTokens for TypeDef {
     }
 }
 
+fn loaded_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
+    let ty_expr = StoredTyExpr(ty);
+
+    match ty {
+        // Vec<T> special case, works a bit like Array
+        TyExpr::Generic { name, params, .. } if name == &["Vec"] => {
+            let inner = loaded_field(quote! { element }, &params[0]);
+
+            quote! {
+                Mutable::new(#expr.into_iter().map(|element| #inner).collect())
+            }
+        }
+        TyExpr::Generic { is_loadable, mutability, .. } => {
+            let inner = match is_loadable {
+                false => quote! { #expr },
+                true => quote! { #ty_expr::load(#expr) }
+            };
+
+            match mutability {
+                Mutability::Immutable => inner,
+                Mutability::Mutable => quote! { Mutable::new(#inner) }
+            }
+        }
+        TyExpr::Array { element, .. } => {
+            let inner = loaded_field(quote! { element }, &**element);
+
+            quote! { Mutable::new(#expr.map(|element| #inner)) }
+        }
+        TyExpr::Tuple(tuple) => {
+            let inner = tuple.iter().enumerate().map(|(index, ty)| {
+                loaded_field(quote! { tuple.#index }, ty)
+            });
+
+            quote! {
+                {
+                    let tuple = #expr;
+                    (#(#inner),*)
+                }
+            }
+        }
+        _ => todo!()
+    }
+}
+
+fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
+    let ty_expr = StoredTyExpr(ty);
+
+    match ty {
+        TyExpr::Generic { name, params, .. } if name == &["Vec"] => {
+            let inner = stored_field(quote! { element }, &params[0]);
+
+            quote! {
+                #expr.borrow().clone().into_iter().map(|element| #inner).collect()
+            }
+        }
+        TyExpr::Generic { is_loadable, mutability, .. } => {
+            let inner = match mutability {
+                Mutability::Immutable => expr,
+                Mutability::Mutable => quote! { #expr.borrow().clone() }
+            };
+
+            match is_loadable {
+                false => inner,
+                true => quote! { #ty_expr::store(#inner) }
+            }
+        }
+        TyExpr::Array { element, .. } => {
+            let inner = stored_field(quote! { element }, &**element);
+
+            quote! {
+                #expr.borrow().clone().map(|element| #inner)
+            }
+        }
+        TyExpr::Tuple(tuple) => {
+            let inner = tuple.iter().enumerate().map(|(index, ty)| {
+                stored_field(quote! { tuple.#index }, ty)
+            });
+
+            quote! {
+                {
+                    let tuple = #expr;
+                    (#(#inner),*)
+                }
+            }
+        }
+        _ => todo!()
+    }
+}
+
 impl ToTokens for Struct {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
@@ -162,7 +251,8 @@ impl ToTokens for Struct {
             is_event,
             is_dataclass,
         } = self;
-        let name = ident(name);
+        let stored_name = ident(name);
+        let name = ident(&format!("Loaded{}", name));
 
         let mut instance_methods = vec![];
         let mut static_methods = vec![];
@@ -173,6 +263,7 @@ impl ToTokens for Struct {
             // perform the heavy lifting of the constructor.
             let ext_params = func.params.iter().map(|(name, ty)| {
                 let name = ident(name);
+                let ty = LoadedTyExpr(ty);
 
                 quote! { #name: #ty }
             });
@@ -197,6 +288,7 @@ impl ToTokens for Struct {
         } else if *is_dataclass {
             let ctor_params = fields.iter().map(|(name, ty_expr, _)| {
                 let name = ident(name);
+                let ty_expr = LoadedTyExpr(ty_expr);
 
                 quote! { #name: #ty_expr }
             });
@@ -235,19 +327,23 @@ impl ToTokens for Struct {
         let event_emit_fn = if *is_event {
             let fs = fields.iter().map(|(name, ty, original_ty)| {
                 let name = ident(name);
-                let needs_clone = !original_ty.is_copy();
 
-                if needs_clone {
-                    quote! { #name: e.#name.clone() }
+                let needs_clone = !original_ty.is_copy();
+                let field = if needs_clone {
+                    quote! { e.#name.clone() }
                 } else {
-                    quote! { #name: e.#name }
-                }
+                    quote! { e.#name }
+                };
+
+                let field = stored_field(quote! { #field }, ty);
+
+                quote! { #name: #field }
             });
 
             Some(quote! {
                 fn __emit__(&self) {
                     let e = self.borrow();
-                    emit!(#name { #(#fs),* })
+                    emit!(#stored_name { #(#fs),* })
                 }
             })
         } else {
@@ -270,30 +366,69 @@ impl ToTokens for Struct {
             None
         };
 
-        let macros = if *is_event {
-            quote! {
-                #[event]
-                #[derive(Clone, Debug, Default)]
-            }
+        let stored_macros = if *is_event {
+            quote! { #[event] }
         } else {
-            quote! {
-                #[derive(Clone, Debug, Default)]
-            }
+            quote! { #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)] }
         };
+
+        let macros = quote! { #[derive(Clone, Debug, Default)] };
+
+        let stored_fields = fields.iter().map(|(name, ty, _)| {
+            let name = ident(name);
+            let ty = StoredTyExpr(ty);
+
+            quote! { pub #name: #ty }
+        });
+
+        let load_fields = fields.iter().map(|(name, ty, _)| {
+            let name = ident(name);
+            let field = loaded_field(quote! { stored.#name }, ty);
+
+            quote! { #name: #field }
+        });
+
+        let store_fields = fields.iter().map(|(name, ty, orig_ty)| {
+            let name = ident(name);
+            let field = if orig_ty.is_copy() {
+                quote! { loaded.#name }
+            } else {
+                quote! { loaded.#name.clone() }
+            };
+            let field = stored_field(field, ty);
+
+            quote! { #name: #field }
+        });
 
         let fields = fields.iter().map(|(name, ty, _)| {
             let name = ident(name);
+            let ty = LoadedTyExpr(ty);
 
             quote! { pub #name: #ty }
         });
 
         tokens.extend(quote! {
+            #stored_macros
+            pub struct #stored_name { #(#stored_fields),* }
+
             #macros
             pub struct #name { #(#fields),* }
 
             #instance_impl
 
             #static_impl
+
+            impl Loadable for #stored_name {
+                type Loaded = #name;
+
+                fn load(stored: Self) -> Self::Loaded {
+                    Self::Loaded { #(#load_fields),* }
+                }
+
+                fn store(loaded: Self::Loaded) -> Self {
+                    Self { #(#store_fields),* }
+                }
+            }
         });
     }
 }
@@ -311,27 +446,28 @@ impl ToTokens for Account {
 
         let account_fields = fields.iter().map(|(name, ty, _)| {
             let name = ident(name);
-            let ty = BaseTyExpr(ty);
+            let ty = StoredTyExpr(ty);
 
             quote! { pub #name: #ty }
         });
 
         let loaded_fields = fields.iter().map(|(name, ty_expr, _)| {
             let name = ident(name);
+            let ty_expr = LoadedTyExpr(ty_expr);
 
             quote! { pub #name: #ty_expr }
         });
 
-        let loads = fields.iter().map(|(name, _, ty)| {
+        let loads = fields.iter().map(|(name, ty, orig_ty)| {
             let name = ident(name);
-
-            if ty.is_mut() {
-                quote! { let #name = Mutable::new(account.#name.clone()); }
-            } else if ty.is_copy() {
-                quote! { let #name = account.#name; }
+            let field = if orig_ty.is_copy() {
+                quote! { account.#name }
             } else {
-                quote! { let #name = account.#name.clone(); }
-            }
+                quote! { account.#name.clone() }
+            };
+            let field = loaded_field(field, ty);
+
+            quote! { let #name = #field; }
         });
 
         let field_names = fields.iter().map(|(name, ..)| {
@@ -340,24 +476,18 @@ impl ToTokens for Account {
             quote! { #name }
         });
 
-        let store_fields = fields.iter().map(|(name, _, ty)| {
+        let store_fields = fields.iter().map(|(name, ty, orig_ty)| {
             let name = ident(name);
-
-            if ty.is_mut() {
-                quote! {
-                    let #name = loaded.#name.borrow().clone();
-                    loaded.__account__.#name = #name;
-                }
-            } else if ty.is_copy() {
-                quote! {
-                    let #name = loaded.#name;
-                    loaded.__account__.#name = #name;
-                }
+            let field = if orig_ty.is_copy() {
+                quote! { loaded.#name }
             } else {
-                quote! {
-                    let #name = loaded.#name.clone();
-                    loaded.__account__.#name = #name;
-                }
+                quote! { loaded.#name.clone() }
+            };
+            let field = stored_field(field, ty);
+
+            quote! {
+                let #name = #field;
+                loaded.__account__.#name = #name;
             }
         });
 
@@ -450,28 +580,54 @@ impl ToTokens for Enum {
     }
 }
 
-/// Newtype to display the "base" type of a type expression.
-struct BaseTyExpr<'a>(&'a TyExpr);
-impl<'a> ToTokens for BaseTyExpr<'a> {
+/// Newtype to display the "loaded" (used at runtime) type of a type expression.
+/// 
+/// Note that there isn't a `ToTokens` implementation for `TyExpr` itself - you
+/// need to choose either `LoadedTyExpr` or `StoredTyExpr` for context.
+pub struct LoadedTyExpr<'a>(pub &'a TyExpr);
+impl<'a> ToTokens for LoadedTyExpr<'a> {
+    // Mutability is relevant in this context and defined types need to be their Loaded- counterpart
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.0 {
-            TyExpr::Generic { name, params, .. } => {
+            TyExpr::Generic { name, params, mutability, is_loadable } => {
                 let path = StaticPath(name);
                 let params = match params.len() {
                     0 => quote! {},
-                    _ => quote! { <#(#params),*> },
+                    _ => {
+                        let params = params.iter().map(|param| LoadedTyExpr(param));
+
+                        quote! { <#(#params),*> }
+                    },
                 };
 
-                quote! { #path #params }
+                let inner = if *is_loadable {
+                    quote! { Loaded!(#path #params) }
+                } else {
+                    quote! { #path #params }
+                };
+
+                match mutability {
+                    Mutability::Immutable => inner,
+                    Mutability::Mutable => quote! { Mutable<#inner> }
+                }
             }
-            TyExpr::Array { element, size } => quote! { [#element; #size] },
-            TyExpr::Tuple(tuple) => quote! { (#(#tuple),*) },
+            TyExpr::Array { element, size } => {
+                let element = LoadedTyExpr(element.as_ref());
+                let size = LoadedTyExpr(size.as_ref());
+
+                quote! { Mutable<[#element; #size]> }
+            },
+            TyExpr::Tuple(tuple) => {
+                let tuple = tuple.iter().map(|element| LoadedTyExpr(element));
+
+                quote! { (#(#tuple),*) }
+            },
             TyExpr::Account(path) => {
                 let mut path = path.clone();
-                path.last_mut().unwrap().insert_str(0, "Loaded");
+                *path.last_mut().unwrap() = format!("Loaded{}", path.last().unwrap());
                 let path = StaticPath(&path);
 
-                quote! { #path<'info, '_> }
+                quote! { Mutable<#path<'info, '_>> }
             }
             TyExpr::Const(size) => {
                 let size = PM2Literal::usize_unsuffixed(*size);
@@ -484,43 +640,49 @@ impl<'a> ToTokens for BaseTyExpr<'a> {
     }
 }
 
-/// Newtype for a type expression that appears in an instruction context.
-struct ContextBaseTyExpr<'a>(&'a TyExpr);
-impl<'a> ToTokens for ContextBaseTyExpr<'a> {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+/// Newtype to display the "stored" (used in on-chain interface) type of a type expression.
+struct StoredTyExpr<'a>(&'a TyExpr);
+impl<'a> ToTokens for StoredTyExpr<'a> {
+    // Mutability is irrelevant in this context
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.0 {
-            TyExpr::Generic { name, params, .. } if name == &vec!["Empty"] => {
-                let base = ContextBaseTyExpr(params.get(0).unwrap());
+            TyExpr::Generic { name, params, .. } => {
+                let path = StaticPath(name);
+                let params = match params.len() {
+                    0 => quote! {},
+                    _ => {
+                        let params = params.iter().map(|param| StoredTyExpr(param));
 
-                quote! { #base }
+                        quote! { <#(#params),*> }
+                    },
+                };
+
+                quote! { #path #params }
             }
+            TyExpr::Array { element, size } => {
+                let element = StoredTyExpr(element.as_ref());
+                let size = StoredTyExpr(size.as_ref());
+
+                quote! { [#element; #size] }
+            },
+            TyExpr::Tuple(tuple) => {
+                let tuple = tuple.iter().map(|element| LoadedTyExpr(element));
+
+                quote! { (#(#tuple),*) }
+            },
             TyExpr::Account(path) => {
-                let path = StaticPath(path);
+                let path = StaticPath(&path);
 
-                quote! { #path }
+                quote! { #path<'info, '_> }
             }
-            ty_expr => {
-                let ty_expr = BaseTyExpr(ty_expr);
+            TyExpr::Const(size) => {
+                let size = PM2Literal::usize_unsuffixed(*size);
 
-                quote! { #ty_expr }
+                quote! { #size }
             }
+            TyExpr::InfoLifetime => quote! { 'info },
+            TyExpr::AnonLifetime => quote! { '_ },
         })
-    }
-}
-
-impl ToTokens for TyExpr {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let base = BaseTyExpr(self);
-        let mutability = match self {
-            Self::Generic { mutability, .. } => mutability.clone(),
-            Self::Array { .. } | Self::Account(..) => Mutability::Mutable,
-            _ => Mutability::Immutable,
-        };
-
-        tokens.extend(match mutability {
-            Mutability::Mutable => quote! { Mutable<#base> },
-            Mutability::Immutable => quote! { #base },
-        });
     }
 }
 
@@ -549,9 +711,12 @@ impl ToTokens for Function {
 
         let params = params.iter().map(|(name, ty)| {
             let name = ident(name);
+            let ty = LoadedTyExpr(ty);
 
             quote! { mut #name: #ty }
         });
+
+        let returns = LoadedTyExpr(returns);
 
         tokens.extend(quote! {
             pub fn #name #info_lifetime(#(#params),*) -> #returns #body
@@ -589,9 +754,12 @@ impl<'a> ToTokens for InstanceMethod<'a> {
             .into_iter()
             .chain(params.iter().map(|(name, ty)| {
                 let name = ident(name);
-
+                let ty = LoadedTyExpr(ty);
+    
                 quote! { mut #name: #ty }
             }));
+    
+        let returns = LoadedTyExpr(returns);
 
         tokens.extend(quote! {
             pub fn #name #info_lifetime(#(#params),*) -> #returns #body
@@ -615,6 +783,7 @@ impl ToTokens for InstructionContext {
             _ => {
                 let params = params.iter().map(|(name, ty_expr)| {
                     let name = ident(name);
+                    let ty_expr = StoredTyExpr(ty_expr);
 
                     quote! { #name: #ty_expr }
                 });
@@ -674,7 +843,6 @@ impl ToTokens for AccountTyExpr {
                 quote! { #ty_expr }
             }
             Self::Defined(ty_expr) => {
-                // let ty_expr = ContextBaseTyExpr(ty_expr);
                 let ty_expr = StaticPath(ty_expr);
 
                 quote! { Box<Account<'info, #ty_expr>> }
@@ -878,18 +1046,6 @@ impl ToTokens for Statement {
                     assign!(#receiver, #value);
                 }
             }
-            Self::IndexAssign {
-                receiver,
-                index,
-                value,
-            } => {
-                let index = Grouped(index);
-                let value = Grouped(value);
-
-                quote! {
-                    index_assign!(#receiver, #index, #value);
-                }
-            }
             Self::Expression(expression) => {
                 let expression = Grouped(expression);
 
@@ -978,7 +1134,11 @@ impl<'a> ToTokens for Grouped<'a> {
         tokens.extend(match &self.0.obj {
             ExpressionObj::BinOp { left, op, right } => quote! { #left #op #right },
             ExpressionObj::UnOp { op, value } => quote! { #op #value },
-            ExpressionObj::As { value, ty } => quote! { #value as #ty },
+            ExpressionObj::As { value, ty } => {
+                let ty = LoadedTyExpr(ty);
+
+                quote! { #value as #ty }
+            },
             obj => quote! { #obj },
         });
     }
@@ -1022,7 +1182,11 @@ impl ToTokens for ExpressionObj {
                     if #cond { #body } else { #orelse }
                 }
             }
-            Self::As { value, ty } => quote! { (#value as #ty) },
+            Self::As { value, ty } => {
+                let ty = LoadedTyExpr(ty);
+
+                quote! { (#value as #ty) }
+            },
             Self::Vec(elements) => {
                 let elements = elements.iter().map(|element| Grouped(element));
 
@@ -1233,6 +1397,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                 }
 
                 let name = ident(name);
+                let ty = StoredTyExpr(ty);
 
                 Some(quote! { #name: #ty })
             });
@@ -1307,7 +1472,7 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
         // Utility structs, functions, and macros to beautify the generated code a little.
         pub mod seahorse_util {
             use super::*;
-            use std::{collections::HashMap, fmt::Debug, ops::Deref};
+            use std::{collections::HashMap, fmt::Debug, ops::{Deref, Index, IndexMut}};
             // Re-export for ease of access
             #[cfg(feature = "pyth-sdk-solana")]
             pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
@@ -1348,25 +1513,65 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
             }
 
             // Pythonic indexing for vec/array types (Seahorse List, Array types)
-            impl<T: Clone> Mutable<Vec<T>> {
-                pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index >= 0 {
-                        return index.try_into().unwrap();
+            pub trait IndexWrapped {
+                type Output;
+                
+                fn index_wrapped(&self, index: i128) -> &Self::Output;
+            }
+
+            pub trait IndexWrappedMut: IndexWrapped {
+                fn index_wrapped_mut(&mut self, index: i128) -> &mut <Self as IndexWrapped>::Output;
+            }
+
+            impl<T> IndexWrapped for Vec<T> {
+                type Output = T;
+
+                fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+                    if index < 0 {
+                        index += self.len() as i128;
                     }
 
-                    index += self.borrow().len() as i128;
-                    return index.try_into().unwrap();
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index(index)
                 }
             }
 
-            impl<T: Clone, const N: usize> Mutable<[T; N]> {
-                pub fn wrapped_index(&self, mut index: i128) -> usize {
-                    if index >= 0 {
-                        return index.try_into().unwrap();
+            impl<T> IndexWrappedMut for Vec<T> {
+                fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+                    if index < 0 {
+                        index += self.len() as i128;
                     }
 
-                    index += self.borrow().len() as i128;
-                    return index.try_into().unwrap();
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index_mut(index)
+                }
+            }
+
+            impl<T, const N: usize> IndexWrapped for [T; N] {
+                type Output = T;
+
+                fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+                    if index < 0 {
+                        index += N as i128;
+                    }
+
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index(index)
+                }
+            }
+
+            impl<T, const N: usize> IndexWrappedMut for [T; N] {
+                fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+                    if index < 0 {
+                        index += N as i128;
+                    }
+
+                    let index: usize = index.try_into().unwrap();
+
+                    self.index_mut(index)
                 }
             }
 
@@ -1432,6 +1637,26 @@ fn make_lib(origin: &Artifact, path: &Vec<String>, program_name: &String) -> CRe
                     pub(crate) use $name;
                 }
             }
+
+            // Trait that allows us to easily define Loaded- (runtime) types for stored data.
+            //
+            // I tried, but this trait can't be used for accounts due to how lifetimes need to be
+            // used in the program vs. how Rust allows us to use them for trait impls.
+            pub trait Loadable {
+                type Loaded;
+
+                fn load(stored: Self) -> Self::Loaded;
+
+                fn store(loaded: Self::Loaded) -> Self;
+            }
+
+            macro_rules! Loaded {
+                ($name:ty) => {
+                    <$name as Loadable>::Loaded
+                }
+            }
+
+            pub(crate) use Loaded;
 
             // Because of how `RefCell::borrow_mut()/borrow()` works, if we try to borrow from the
             // same value we're assigning to it will cause an error at runtime, for example:

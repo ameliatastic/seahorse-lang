@@ -89,13 +89,14 @@ pub enum TyExpr {
         mutability: Mutability,
         name: Vec<String>,
         params: Vec<TyExpr>,
+        is_loadable: bool,
     },
     Array {
         element: Box<TyExpr>,
         size: Box<TyExpr>,
     },
     Tuple(Vec<TyExpr>),
-    Account(Vec<String>),
+    Account(Vec<String>), // Type expression explicitly for defined accounts
     Const(usize),
     InfoLifetime,
     AnonLifetime,
@@ -114,6 +115,7 @@ impl TyExpr {
             mutability,
             name: name.into_iter().map(|part| part.to_string()).collect(),
             params: vec![],
+            is_loadable: false,
         }
     }
 
@@ -232,11 +234,6 @@ pub enum Statement {
     },
     Assign {
         receiver: TypedExpression,
-        value: TypedExpression,
-    },
-    IndexAssign {
-        receiver: TypedExpression,
-        index: TypedExpression,
         value: TypedExpression,
     },
     Expression(TypedExpression),

@@ -1,6 +1,6 @@
 //! The Seahorse Prelude includes a bunch of builtin types that convert to Rust/Anchor.
 
-use crate::core::compile::builtin::*;
+use crate::core::{compile::builtin::*, generate::LoadedTyExpr};
 pub use crate::core::{
     compile::{ast::*, build::*, check::*, namespace::*, sign::*},
     util::*,
@@ -140,10 +140,12 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", Ty::prelude(self.clone(), vec![]))],
                                     params: vec![],
+                                    is_loadable: false
                                 };
 
                                 Transformation::new(move |mut expr| {
                                     let x = match1!(expr.obj, ExpressionObj::Call { args, .. } => args.into_iter().next().unwrap());
+                                    let ty = LoadedTyExpr(&ty);
 
                                     expr.obj = ExpressionObj::Rendered(quote! {
                                         <#ty as TryFrom<_>>::try_from(#x).unwrap()
@@ -1190,21 +1192,17 @@ impl BuiltinSource for Prelude {
                     Ty::Transformed(
                         Ty::Anonymous(0).into(),
                         Transformation::new(|mut expr| {
-                            let (value, mut index) = match1!(expr.obj, ExpressionObj::Index { value, index } => (*value, *index));
-                            let value_unwrapped = match &value.obj {
-                                ExpressionObj::BorrowImmut(value) => &**value,
-                                ExpressionObj::BorrowMut(value) => &**value,
-                                _ => panic!(),
-                            };
-
-                            index.obj = ExpressionObj::Rendered(quote! {
-                                #value_unwrapped.wrapped_index(#index as i128)
-                            });
-
-                            expr.obj = ExpressionObj::Index {
-                                value: value.into(),
-                                index: index.into(),
-                            };
+                            let (value, index) = match1!(expr.obj, ExpressionObj::Index { value, index } => (*value, *index));
+                            
+                            if let ExpressionObj::BorrowMut(..) = &value.obj {
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    (*#value.index_wrapped_mut(#index.into()))
+                                });
+                            } else {
+                                expr.obj = ExpressionObj::Rendered(quote! {
+                                    (*#value.index_wrapped(#index.into()))
+                                });
+                            }
 
                             Ok(Transformed::Expression(expr))
                         }),
@@ -1285,6 +1283,7 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", expr.ty)],
                                     params: vec![],
+                                    is_loadable: false
                                 },
                                 value: expr.obj.into(),
                             };
@@ -1302,6 +1301,7 @@ impl BuiltinSource for Prelude {
                                     mutability: Mutability::Immutable,
                                     name: vec![format!("{}", expr.ty)],
                                     params: vec![],
+                                    is_loadable: false
                                 },
                                 value: expr.obj.into(),
                             };

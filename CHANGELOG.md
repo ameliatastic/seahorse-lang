@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Access to Pyth `Price.publish_time` (#91)
+- Accounts can now store complex types (lists, user-defined classes, multi-dimensional arrays, etc.)
 
 ### Fixed
 
 - Bug with unary not operator
 - Pyth compile error on latest version (#91)
+- Bug that prevented lists from being used in events
+- Bug that prevented users from importing accounts from other files
 
 ## [0.2.7]
 
