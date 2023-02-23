@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pyth compile error on latest version (#91)
 - Bug that prevented lists from being used in events
 - Bug that prevented users from importing accounts from other files
+- Conditionally generate Pyth import (#93)
 
 ## [0.2.7]
 
