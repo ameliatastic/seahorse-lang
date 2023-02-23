@@ -207,15 +207,6 @@ fn stored_field(expr: TokenStream, ty: &TyExpr) -> TokenStream {
                 #expr.borrow().clone().into_iter().map(|element| #inner).collect()
             }
         }
-        // TODO hack to get strings working with accounts
-        // Not sure if the assumption made in this function should be "expr is assumed to be owned"
-        // or "expr is assumed to be borrowed," since cloning to assert ownership is safer but might
-        // be needlessly expensive
-        TyExpr::Generic { name, .. } if name == &["String"] => {
-            quote! {
-                #expr.clone()
-            }
-        }
         TyExpr::Generic { is_loadable, mutability, .. } => {
             let inner = match mutability {
                 Mutability::Immutable => expr,
@@ -397,9 +388,14 @@ impl ToTokens for Struct {
             quote! { #name: #field }
         });
 
-        let store_fields = fields.iter().map(|(name, ty, _)| {
+        let store_fields = fields.iter().map(|(name, ty, orig_ty)| {
             let name = ident(name);
-            let field = stored_field(quote! { loaded.#name }, ty);
+            let field = if orig_ty.is_copy() {
+                quote! { loaded.#name }
+            } else {
+                quote! { loaded.#name.clone() }
+            };
+            let field = stored_field(field, ty);
 
             quote! { #name: #field }
         });
@@ -462,9 +458,14 @@ impl ToTokens for Account {
             quote! { pub #name: #ty_expr }
         });
 
-        let loads = fields.iter().map(|(name, ty, _)| {
+        let loads = fields.iter().map(|(name, ty, orig_ty)| {
             let name = ident(name);
-            let field = loaded_field(quote! { account.#name.clone() }, ty);
+            let field = if orig_ty.is_copy() {
+                quote! { account.#name }
+            } else {
+                quote! { account.#name.clone() }
+            };
+            let field = loaded_field(field, ty);
 
             quote! { let #name = #field; }
         });
@@ -475,9 +476,14 @@ impl ToTokens for Account {
             quote! { #name }
         });
 
-        let store_fields = fields.iter().map(|(name, ty, _)| {
+        let store_fields = fields.iter().map(|(name, ty, orig_ty)| {
             let name = ident(name);
-            let field = stored_field(quote! { loaded.#name }, ty);
+            let field = if orig_ty.is_copy() {
+                quote! { loaded.#name }
+            } else {
+                quote! { loaded.#name.clone() }
+            };
+            let field = stored_field(field, ty);
 
             quote! {
                 let #name = #field;
