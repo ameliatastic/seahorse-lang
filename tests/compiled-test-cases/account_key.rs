@@ -118,7 +118,11 @@ pub mod seahorse_util {
 
     #[cfg(feature = "pyth-sdk-solana")]
     pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
-    use std::{collections::HashMap, fmt::Debug, ops::Deref};
+    use std::{
+        collections::HashMap,
+        fmt::Debug,
+        ops::{Deref, Index, IndexMut},
+    };
 
     pub struct Mutable<T>(Rc<RefCell<T>>);
 
@@ -154,27 +158,65 @@ pub mod seahorse_util {
         }
     }
 
-    impl<T: Clone> Mutable<Vec<T>> {
-        pub fn wrapped_index(&self, mut index: i128) -> usize {
-            if index >= 0 {
-                return index.try_into().unwrap();
+    pub trait IndexWrapped {
+        type Output;
+
+        fn index_wrapped(&self, index: i128) -> &Self::Output;
+    }
+
+    pub trait IndexWrappedMut: IndexWrapped {
+        fn index_wrapped_mut(&mut self, index: i128) -> &mut <Self as IndexWrapped>::Output;
+    }
+
+    impl<T> IndexWrapped for Vec<T> {
+        type Output = T;
+
+        fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+            if index < 0 {
+                index += self.len() as i128;
             }
 
-            index += self.borrow().len() as i128;
+            let index: usize = index.try_into().unwrap();
 
-            return index.try_into().unwrap();
+            self.index(index)
         }
     }
 
-    impl<T: Clone, const N: usize> Mutable<[T; N]> {
-        pub fn wrapped_index(&self, mut index: i128) -> usize {
-            if index >= 0 {
-                return index.try_into().unwrap();
+    impl<T> IndexWrappedMut for Vec<T> {
+        fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+            if index < 0 {
+                index += self.len() as i128;
             }
 
-            index += self.borrow().len() as i128;
+            let index: usize = index.try_into().unwrap();
 
-            return index.try_into().unwrap();
+            self.index_mut(index)
+        }
+    }
+
+    impl<T, const N: usize> IndexWrapped for [T; N] {
+        type Output = T;
+
+        fn index_wrapped(&self, mut index: i128) -> &Self::Output {
+            if index < 0 {
+                index += N as i128;
+            }
+
+            let index: usize = index.try_into().unwrap();
+
+            self.index(index)
+        }
+    }
+
+    impl<T, const N: usize> IndexWrappedMut for [T; N] {
+        fn index_wrapped_mut(&mut self, mut index: i128) -> &mut <Self as IndexWrapped>::Output {
+            if index < 0 {
+                index += N as i128;
+            }
+
+            let index: usize = index.try_into().unwrap();
+
+            self.index_mut(index)
         }
     }
 
@@ -233,6 +275,22 @@ pub mod seahorse_util {
             pub(crate) use $name;
         };
     }
+
+    pub trait Loadable {
+        type Loaded;
+
+        fn load(stored: Self) -> Self::Loaded;
+
+        fn store(loaded: Self::Loaded) -> Self;
+    }
+
+    macro_rules! Loaded {
+        ($ name : ty) => {
+            <$name as Loadable>::Loaded
+        };
+    }
+
+    pub(crate) use Loaded;
 
     #[macro_export]
     macro_rules! assign {
