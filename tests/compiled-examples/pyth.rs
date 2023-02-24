@@ -12,81 +12,29 @@ use anchor_lang::{prelude::*, solana_program};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::{cell::RefCell, rc::Rc};
 
-#[account]
-#[derive(Debug)]
-pub struct Hello {
-    pub bump: u8,
-}
-
-impl<'info, 'entrypoint> Hello {
-    pub fn load(
-        account: &'entrypoint mut Box<Account<'info, Self>>,
-        programs_map: &'entrypoint ProgramsMap<'info>,
-    ) -> Mutable<LoadedHello<'info, 'entrypoint>> {
-        let bump = account.bump;
-
-        Mutable::new(LoadedHello {
-            __account__: account,
-            __programs__: programs_map,
-            bump,
-        })
-    }
-
-    pub fn store(loaded: Mutable<LoadedHello>) {
-        let mut loaded = loaded.borrow_mut();
-        let bump = loaded.bump;
-
-        loaded.__account__.bump = bump;
-    }
-}
-
-#[derive(Debug)]
-pub struct LoadedHello<'info, 'entrypoint> {
-    pub __account__: &'entrypoint mut Box<Account<'info, Hello>>,
-    pub __programs__: &'entrypoint ProgramsMap<'info>,
-    pub bump: u8,
-}
-
-pub fn init_handler<'info>(
-    mut owner: SeahorseSigner<'info, '_>,
-    mut hello: Empty<Mutable<LoadedHello<'info, '_>>>,
-    mut mint: Empty<SeahorseAccount<'info, '_, Mint>>,
-) -> () {
-    let mut bump = hello.bump.unwrap();
-    let mut hello = hello.account.clone();
-
-    mint.account.clone();
-
-    assign!(hello.borrow_mut().bump, bump);
-}
-
-pub fn say_hello_handler<'info>(
-    mut user_acc: SeahorseAccount<'info, '_, TokenAccount>,
-    mut hello: Mutable<LoadedHello<'info, '_>>,
-    mut mint: SeahorseAccount<'info, '_, Mint>,
-) -> () {
-    let mut bump = hello.borrow().bump;
-
-    solana_program::msg!("{}", format!("Hello {:?}, have a token!", user_acc.owner));
-
-    token::mint_to(
-        CpiContext::new_with_signer(
-            mint.programs.get("token_program"),
-            token::MintTo {
-                mint: mint.to_account_info(),
-                authority: hello.borrow().__account__.to_account_info(),
-                to: user_acc.clone().to_account_info(),
-            },
-            &[Mutable::new(vec![
-                "hello".to_string().as_bytes().as_ref(),
-                bump.to_le_bytes().as_ref(),
+pub fn use_sol_usd_price_handler<'info>(mut price_account: UncheckedAccount<'info>) -> () {
+    let mut price_feed = {
+        if price_account.key()
+            != Pubkey::new_from_array([
+                254u8, 101u8, 15u8, 3u8, 103u8, 212u8, 167u8, 239u8, 152u8, 21u8, 165u8, 147u8,
+                234u8, 21u8, 211u8, 101u8, 147u8, 240u8, 100u8, 58u8, 170u8, 240u8, 20u8, 155u8,
+                176u8, 75u8, 230u8, 122u8, 184u8, 81u8, 222u8, 205u8,
             ])
-            .borrow()
-            .as_slice()],
-        ),
-        <u64 as TryFrom<_>>::try_from(1).unwrap(),
-    )
-    .unwrap();
+        {
+            panic!("Pyth PriceAccount validation failed: expected devnet-SOL/USD")
+        }
+
+        load_price_feed_from_account_info(&price_account).unwrap()
+    };
+
+    let mut price = price_feed.get_price_unchecked();
+    let mut price = {
+        let price = price;
+
+        (price.price as f64) * 10f64.powf(price.expo as f64)
+    };
+
+    solana_program::msg!("{}", price);
 }
 
 // ===== lib.rs =====
@@ -106,10 +54,12 @@ use anchor_spl::{
 use dot::program::*;
 use std::{cell::RefCell, rc::Rc};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("EkY7qZD2RCr1LpUzADJkzbjGaWfbvGYB9eJe7DYCgGF8");
 
 pub mod seahorse_util {
     use super::*;
+
+    pub use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
     use std::{
         collections::HashMap,
         fmt::Debug,
@@ -311,97 +261,24 @@ pub mod seahorse_util {
 }
 
 #[program]
-mod hello {
+mod pyth {
     use super::*;
     use seahorse_util::*;
     use std::collections::HashMap;
 
     #[derive(Accounts)]
-    pub struct Init<'info> {
-        #[account(mut)]
-        pub owner: Signer<'info>,
-        # [account (init , space = std :: mem :: size_of :: < dot :: program :: Hello > () + 8 , payer = owner , seeds = ["hello" . as_bytes () . as_ref ()] , bump)]
-        pub hello: Box<Account<'info, dot::program::Hello>>,
-        # [account (init , payer = owner , seeds = ["hello-mint" . as_bytes () . as_ref ()] , bump , mint :: decimals = 0 , mint :: authority = hello)]
-        pub mint: Box<Account<'info, Mint>>,
-        pub rent: Sysvar<'info, Rent>,
-        pub system_program: Program<'info, System>,
-        pub token_program: Program<'info, Token>,
+    pub struct UseSolUsdPrice<'info> {
+        #[account()]
+        #[doc = "CHECK: This account is unchecked."]
+        pub price_account: UncheckedAccount<'info>,
     }
 
-    pub fn init(ctx: Context<Init>) -> Result<()> {
+    pub fn use_sol_usd_price(ctx: Context<UseSolUsdPrice>) -> Result<()> {
         let mut programs = HashMap::new();
-
-        programs.insert(
-            "system_program",
-            ctx.accounts.system_program.to_account_info(),
-        );
-
-        programs.insert(
-            "token_program",
-            ctx.accounts.token_program.to_account_info(),
-        );
-
         let programs_map = ProgramsMap(programs);
-        let owner = SeahorseSigner {
-            account: &ctx.accounts.owner,
-            programs: &programs_map,
-        };
+        let price_account = &ctx.accounts.price_account.clone();
 
-        let hello = Empty {
-            account: dot::program::Hello::load(&mut ctx.accounts.hello, &programs_map),
-            bump: ctx.bumps.get("hello").map(|bump| *bump),
-        };
-
-        let mint = Empty {
-            account: SeahorseAccount {
-                account: &ctx.accounts.mint,
-                programs: &programs_map,
-            },
-            bump: ctx.bumps.get("mint").map(|bump| *bump),
-        };
-
-        init_handler(owner.clone(), hello.clone(), mint.clone());
-
-        dot::program::Hello::store(hello.account);
-
-        return Ok(());
-    }
-
-    #[derive(Accounts)]
-    pub struct SayHello<'info> {
-        #[account(mut)]
-        pub user_acc: Box<Account<'info, TokenAccount>>,
-        #[account(mut)]
-        pub hello: Box<Account<'info, dot::program::Hello>>,
-        #[account(mut)]
-        pub mint: Box<Account<'info, Mint>>,
-        pub token_program: Program<'info, Token>,
-    }
-
-    pub fn say_hello(ctx: Context<SayHello>) -> Result<()> {
-        let mut programs = HashMap::new();
-
-        programs.insert(
-            "token_program",
-            ctx.accounts.token_program.to_account_info(),
-        );
-
-        let programs_map = ProgramsMap(programs);
-        let user_acc = SeahorseAccount {
-            account: &ctx.accounts.user_acc,
-            programs: &programs_map,
-        };
-
-        let hello = dot::program::Hello::load(&mut ctx.accounts.hello, &programs_map);
-        let mint = SeahorseAccount {
-            account: &ctx.accounts.mint,
-            programs: &programs_map,
-        };
-
-        say_hello_handler(user_acc.clone(), hello.clone(), mint.clone());
-
-        dot::program::Hello::store(hello);
+        use_sol_usd_price_handler(price_account.clone());
 
         return Ok(());
     }
