@@ -45,7 +45,45 @@ enum Error {
     StatementClassDef,
     StatementFunctionDef,
     OperatorMatMult,
+    RustKeyword(String)
 }
+
+const RUST_KEYWORDS: [&str; 25] = [
+    "match",
+    "_",
+    "let",
+    "crate",
+    "enum",
+    "extern",
+    "false",
+    "true",
+    "fn",
+    "impl",
+    "loop",
+    "mod",
+    "move",
+    "mut",
+    "pub",
+    "ref",
+    "Self",
+    "static",
+    "struct",
+    "super",
+    "trait",
+    "unsafe",
+    "use",
+    "where",
+    "dyn",
+];
+
+fn check_identifier(name: &String, location: &Location) -> Result<(), CoreError> {
+    if RUST_KEYWORDS.contains(&name.as_str()) {
+        Err(Error::RustKeyword(name.clone()).core(location.clone()))
+    } else {
+        Ok(())
+    }
+}
+
 
 impl Error {
     fn core(self, loc: Location) -> CoreError {
@@ -195,6 +233,12 @@ impl Error {
                 "matrix multiplication is unsupported",
                 ""
             ),
+            Self::RustKeyword(name) => {
+                CoreError::make_raw(
+                    format!("{} is a rust keyword, cannot be used as an identifier", name),
+                    "Help: try changing it to a non Rust keyword"
+                )
+            },
         }
     }
 }
@@ -301,6 +345,7 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 keywords,
                 decorator_list,
             } => {
+                check_identifier(&name, &location)?;
                 if keywords.len() > 0 {
                     Err(Error::ClassDefWithKeywords)
                 } else {
@@ -329,6 +374,7 @@ impl TryInto<TopLevelStatement> for WithSrc<py::Statement> {
                 decorator_list,
                 returns,
             } => {
+                check_identifier(&name, &location)?;
                 if is_async {
                     Err(Error::Async)
                 } else {
@@ -417,13 +463,16 @@ impl TryInto<ClassDefStatement> for WithSrc<py::Statement> {
                 annotation,
                 value,
             } => match target.node {
-                py::ExpressionType::Identifier { name } => Ok(ClassDefStatementObj::FieldDef {
-                    name,
-                    ty: Some(WithSrc::new(&src, *annotation).try_into()?),
-                    value: value
-                        .map(|value| WithSrc::new(&src, value).try_into())
-                        .transpose()?,
-                }),
+                py::ExpressionType::Identifier { name } =>  {
+                    check_identifier(&name, &location)?;
+                    Ok(ClassDefStatementObj::FieldDef {
+                        name,
+                        ty: Some(WithSrc::new(&src, *annotation).try_into()?),
+                        value: value
+                            .map(|value| WithSrc::new(&src, value).try_into())
+                            .transpose()?,
+                    })
+                },
                 _ => Err(Error::ArbitraryClassDefStatement),
             },
             py::StatementType::FunctionDef {
@@ -434,6 +483,7 @@ impl TryInto<ClassDefStatement> for WithSrc<py::Statement> {
                 decorator_list,
                 returns,
             } => {
+                check_identifier(&name, &location)?;
                 if is_async {
                     Err(Error::Async)
                 } else {
@@ -506,6 +556,7 @@ impl TryInto<Param> for WithSrc<py::Parameter> {
         let location = Location::new(&src, obj.location);
 
         if let Some(annotation) = obj.annotation {
+            check_identifier(&obj.arg, &location)?;
             Ok(Located(
                 location,
                 ParamObj {
@@ -678,7 +729,10 @@ impl TryInto<Expression> for WithSrc<py::Expression> {
                 }),
                 _ => panic!("Encountered an unexpected syntax element"),
             },
-            py::ExpressionType::Identifier { name } => Ok(ExpressionObj::Id(name)),
+            py::ExpressionType::Identifier { name } => {
+                check_identifier(&name, &location)?;
+                Ok(ExpressionObj::Id(name))
+            },
             py::ExpressionType::True => Ok(ExpressionObj::Bool(true)),
             py::ExpressionType::False => Ok(ExpressionObj::Bool(false)),
             py::ExpressionType::None => Ok(ExpressionObj::None),
