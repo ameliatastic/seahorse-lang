@@ -4,7 +4,6 @@ Be sure to check out Seahorse's community and community-made projects!
 
 Official Seahorse links:
 
-* [Discord](http://discord.gg/4sFzH5pus8)
 * [Twitter](https://twitter.com/seahorse\_lang)
 
 Community tutorials and resources:

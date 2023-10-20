@@ -4,7 +4,7 @@ description: Dip your toes in the water by writing a simple program in Seahorse.
 
 # Calculator: Your first Seahorse program
 
-Full code [here](https://github.com/ameliatastic/seahorse-lang/blob/main/examples/calculator.py).
+Full code [here](../../examples/calculator.py).
 
 ### Initializing the project <a href="#initializing-the-project" id="initializing-the-project"></a>
 
@@ -184,7 +184,7 @@ And that's it for our calculator program! Make sure it builds before we move on:
 seahorse build
 ```
 
-You can see the full code [here](https://github.com/ameliatastic/seahorse-lang/blob/main/examples/calculator.py).
+You can see the full code [here](../../examples/calculator.py).
 
 ### Testing with Anchor <a href="#testing-with-anchor" id="testing-with-anchor"></a>
 

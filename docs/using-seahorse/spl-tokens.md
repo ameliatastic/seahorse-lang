@@ -4,7 +4,7 @@
 
 Solana's standard way of creating new token types is by creating a new Mint with the SPL token program. Seahorse provides convenient built-in support for the SPL token program.
 
-You can see an example of creating and using a token mint [here](https://github.com/ameliatastic/seahorse-lang/blob/main/examples/hello.py).
+You can see an example of creating and using a token mint [here](../../examples/hello.py).
 
 #### TokenAccount <a href="#token-account" id="token-account"></a>
 

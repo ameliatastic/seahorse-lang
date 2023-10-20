@@ -130,7 +130,7 @@ def use_unchecked(unchecked: UncheckedAccount):
 
 #### Program <a href="#program" id="program"></a>
 
-Account that allows you to invoke CPI calls! More on this in [Other CPIs](https://seahorse-lang.org/docs/cpis).
+Account that allows you to invoke CPI calls! More on this in [CPI Section](https://www.seahorse.dev/using-seahorse/cross-program-invocations-cpis).
 
 Usage:
 

@@ -23,7 +23,7 @@ Seahorse uses rustfmt to help generate better-looking Rust code.
 From your terminal run:
 
 ```
-cargo install seahorse-lang
+cargo install seahorse-dev
 ```
 
 This will install the `seahorse` binary.

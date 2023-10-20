@@ -10,7 +10,7 @@ description: >-
 
 Seahorse tries as hard as possible to do everything that Python does. However, some things that Python can do aren't very feasibly translated to Rust. For example, Rust structs know all of their fields at compile-time, but Python objects can gain additional fields at runtime - it might be possible to support Python here, but it would come at a big runtime cost.
 
-The most important distinction is static vs. dynamic typing, discussed [here](https://seahorse-lang.org/docs/seahorse-lang#type-hints-and-static-typing).
+The most important distinction is static vs. dynamic typing, discussed [here](the-seahorse-language.md#type-hints-and-static-typing).
 
 One feature of Python's that is (nearly) fully supported by Seahorse is the way that values are passed by alias. This basically means that if you have some value in a variable, re-assigning this value to another variable will simply make a secondary alias for the same data:
 
@@ -37,10 +37,10 @@ When you first create a Seahorse project, a Python file called **prelude.py** is
 
 | Type                                               | Description                                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `u8, u16, ... u128`, `i8, i16, ... i128`, `f64`    | Simple numeric types that map to Rust builtin types of the same names. Includes some functions to convert between types, since Seahorse cannot always do this automatically (but it tries - see [Numbers and math](https://seahorse-lang.org/docs/seahorse-lang#numbers-and-math))                                 |
+| `u8, u16, ... u128`, `i8, i16, ... i128`, `f64`    | Simple numeric types that map to Rust builtin types of the same names. Includes some functions to convert between types, since Seahorse cannot always do this automatically (but it tries - see [Numbers and math](the-seahorse-language.md#numbers-and-math))                                                     |
 | `Array[T, N]`                                      | Fixed-length array, like a Python `list` but with a size. `N` must be an integer literal. Can be created as through the class constructor (`Array(Iter[T], u64)` where the second argument is the length) or the function constructor (`array(...T)`) Arrays can be used in any function that accepts an iterable. |
 | `Pubkey`                                           | A 32-byte public key.                                                                                                                                                                                                                                                                                              |
-| `Account`, `Signer`, `Empty`, `TokenAccount`, etc. | Types for supported Solana accounts. Discussed in detail [here](https://seahorse-lang.org/docs/accounts).                                                                                                                                                                                                          |
+| `Account`, `Signer`, `Empty`, `TokenAccount`, etc. | Types for supported Solana accounts. Discussed in detail [here](accounts.md).                                                                                                                                                                                                                                      |
 
 ### Python constructs and builtins <a href="#python-constructs-and-builtins" id="python-constructs-and-builtins"></a>
 
@@ -159,7 +159,7 @@ These are some of the weirder/more Pythonic language constructs that you can use
 * **Tuple assignment**\
   Seahorse supports tuple assignment exactly like Python does - you can iterate over lists of tuples with `for (x, y) in ...`, and you can unpack tuples with `x, y = ...`. You can even do the Pythonic one-line swap: `x, y = y, x`.
 * **Functional programming and functions as first-class objects**\
-  _Partially supported_. New in v2, you can do things that rely on functional programming - namely `map` and `filter` (see [Builtins for working with iterators](https://seahorse-lang.org/docs/seahorse-lang#builtins-for-working-with-iterators)). Functions are not first-class objects in Seahorse, though, so you may not assign a function to a variable and pass it around that way.
+  _Partially supported_. New in v2, you can do things that rely on functional programming - namely `map` and `filter` (see [Builtins for working with iterators](the-seahorse-language.md#builtins-for-working-with-iterators)). Functions are not first-class objects in Seahorse, though, so you may not assign a function to a variable and pass it around that way.
 
 #### General builtins <a href="#general-builtins" id="general-builtins"></a>
 
