@@ -1,6 +1,6 @@
 # Table of contents
 
-* [Seahorse  (beta)](README.md)
+* [Seahorse Lang](README.md)
 
 ## Introduction
 
