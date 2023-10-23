@@ -1,11 +1,11 @@
 [package]
-name = "seahorse-lang"
-version = "0.2.7"
+name = "seahorse-dev"
+version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Write Anchor-compatible Solana programs in Python"
-homepage = "https://seahorse-lang.org/"
-repository = "https://github.com/ameliatastic/seahorse-lang/"
+homepage = "https://www.seahorse.dev/"
+repository = "https://github.com/solana-developers/seahorse/"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -89,8 +89,6 @@ q = Point.origin()
 print(q.magnitude()) # 0.0
 ```
 
-One limitation of used-defined classes is that _they may not be stored in accounts._ [This is a known issue](https://github.com/ameliatastic/seahorse-lang/issues/33), and it's being worked on.
-
 **Automatic constructors with `@dataclass`**
 
 Constructors can be automatically generated for classes with the [`@dataclass` decorator](https://docs.python.org/3/library/dataclasses.html):
@@ -319,7 +317,7 @@ In Seahorse, there is no concept of a script - the code you write is used to gen
 | Class definitions       | Arbitrary classes                                                                                                                             |
 | Function definitions    | Arbitrary functions                                                                                                                           |
 | Instruction definitions | Functions decorated with `@instruction`                                                                                                       |
-| `declare_id('...')`     | A special statement that tells Anchor what your program's ID is - more on this [here](https://seahorse-lang.org/docs/seahorse-lang#declareid) |
+| `declare_id('...')`     | A special statement that tells Anchor what your program's ID is - more on this [here](https://www.seahorse.dev/using-seahorse/the-seahorse-language#declare-id) |
 
 ### Directives <a href="#directives" id="directives"></a>
 

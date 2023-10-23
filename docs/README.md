@@ -53,4 +53,4 @@ _Seahorse is beta software. Many features are unimplemented and it's not product
 
 #### Community <a href="#community" id="community"></a>
 
-Seahorse is more than just a compiler, it's also a community of people who want to make development on Solana better. We're officially on [Discord](http://discord.gg/4sFzH5pus8) and [Twitter](https://twitter.com/seahorse\_lang). **You can also check out a bunch of other community-made resources** [**here**](https://seahorse-lang.org/docs/community)**!**
+Seahorse is more than just a compiler, it's also a community of people who want to make development on Solana better. We're on [Twitter](https://twitter.com/seahorse\_lang). **You can also check out a bunch of other community-made resources** [**here**](https://www.seahorse.dev/introduction/seahorse-community)**!**
