@@ -16,9 +16,9 @@ The Seahorse compiler generates intermediate Rust artifacts and uses Anchor to d
 
 _Seahorse is beta software. Many features are unimplemented and it's not production-ready._
 
-[**Get started**](https://seahorse-lang.org/)
+[**Get started**](https://www.seahorse.dev/)
 
-[**Installation**](https://seahorse-lang.org/docs/installation)
+[**Installation**](https://www.seahorse.dev/introduction/installation)
 
 [**Examples**](/examples/)
 
@@ -55,7 +55,7 @@ def do_fizzbuzz(fizzbuzz: FizzBuzz, n: u64):
     fizzbuzz.n = 0
 ```
 
-This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
+This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://www.seahorse.dev/introduction/calculator-your-first-seahorse-program) or other examples [here](/examples/).
 
 The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](/src/core/README.md):
 

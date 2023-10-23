@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Write Anchor-compatible Solana programs in Python"
-homepage = "https://seahorse.dev/"
+homepage = "https://www.seahorse.dev/"
 repository = "https://github.com/solana-developers/seahorse/"
 readme = "README.md"
 
