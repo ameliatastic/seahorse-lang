@@ -20,7 +20,7 @@ _Seahorse is beta software. Many features are unimplemented and it's not product
 
 [**Installation**](https://www.seahorse.dev/introduction/installation)
 
-[**Examples**](/examples/)
+[**Examples**](https://github.com/solana-developers/seahorse/tree/main/examples)
 
 ## Example: FizzBuzz
 
@@ -55,9 +55,9 @@ def do_fizzbuzz(fizzbuzz: FizzBuzz, n: u64):
     fizzbuzz.n = 0
 ```
 
-This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://www.seahorse.dev/introduction/calculator-your-first-seahorse-program) or other examples [here](/examples/).
+This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://www.seahorse.dev/introduction/calculator-your-first-seahorse-program) or other examples [here](https://github.com/solana-developers/seahorse/tree/main/examples).
 
-The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](/src/core/README.md):
+The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](https://github.com/solana-developers/seahorse/tree/main/src/core):
 
 ```
 SEAHORSE CORE: THE COMPILER (v0.2.0)
