@@ -1,5 +1,7 @@
 # seahorse: Write Solana programs in Python
 
+> This is a fork of [seahorse-lang](https://github.com/ameliatastic/seahorse-lang). The original repository is deprecated and is broken with latest anchor updates, and is no longer maintained by its creator. If you're using `seahorse-lang` in your project, we would highly recommend migrating to `seahorse-dev`.
+
 ## The ease of Python with the safety of Rust.
 
 Seahorse lets you write Solana programs in Python. It is a community-led project built on [Anchor](https://github.com/coral-xyz/anchor).
