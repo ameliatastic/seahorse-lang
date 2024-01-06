@@ -1358,7 +1358,6 @@ fn make_lib(
 
             let load_accounts = ix_context.accounts.iter().filter_map(
                 |(name, ContextAccount { account_ty, ty, .. })| {
-                    let name_str = name;
                     let name = ident(name);
 
                     // Deconstruct `Empty` accounts
@@ -1400,7 +1399,7 @@ fn make_lib(
                         quote! {
                             let #name = Empty {
                                 account: #loaded,
-                                bump: ctx.bumps.get(#name_str).map(|bump| *bump)
+                                bump: Some(ctx.bumps.#name)
                             };
                         }
                     } else {
