@@ -214,6 +214,14 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             pyth.insert("optional", Value::Boolean(Formatted::new(true)));
             cargo["dependencies"]["pyth-sdk-solana"] = Item::Value(Value::InlineTable(pyth));
 
+            // Fix 'error[E0658]: use of unstable library feature 'build_hasher_simple_hash_one'
+            let mut ahash = InlineTable::new();
+            ahash.insert(
+                "version",
+                Value::String(Formatted::new("=0.8.4".to_string())),
+            );
+            cargo["dependencies"]["ahash"] = Item::Value(Value::InlineTable(ahash));
+
             File::create(&cargo_path)?.write_all(cargo.to_string().as_bytes())?;
 
             // Add Anchor seeds feature
