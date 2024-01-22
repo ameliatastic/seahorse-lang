@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> This repository is no logmer maintained. Please see [solana-developers/seahorse](https://github.com/solana-developers/seahorse) for up to date code and documentation.
+
 # seahorse: Write Solana programs in Python
 
 ## The ease of Python with the safety of Rust.
