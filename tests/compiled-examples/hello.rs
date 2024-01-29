@@ -350,7 +350,7 @@ mod hello {
 
         let hello = Empty {
             account: dot::program::Hello::load(&mut ctx.accounts.hello, &programs_map),
-            bump: ctx.bumps.get("hello").map(|bump| *bump),
+            bump: Some(ctx.bumps.hello),
         };
 
         let mint = Empty {
@@ -358,7 +358,7 @@ mod hello {
                 account: &ctx.accounts.mint,
                 programs: &programs_map,
             },
-            bump: ctx.bumps.get("mint").map(|bump| *bump),
+            bump: Some(ctx.bumps.mint),
         };
 
         init_handler(owner.clone(), hello.clone(), mint.clone());

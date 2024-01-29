@@ -704,7 +704,7 @@ mod stored_mutables {
 
         let data = Empty {
             account: dot::program::Data::load(&mut ctx.accounts.data, &programs_map),
-            bump: ctx.bumps.get("data").map(|bump| *bump),
+            bump: Some(ctx.bumps.data),
         };
 
         init_handler(signer.clone(), data.clone());
