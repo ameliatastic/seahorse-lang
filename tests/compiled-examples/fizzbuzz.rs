@@ -357,7 +357,7 @@ mod fizzbuzz {
 
         let fizzbuzz = Empty {
             account: dot::program::FizzBuzz::load(&mut ctx.accounts.fizzbuzz, &programs_map),
-            bump: ctx.bumps.get("fizzbuzz").map(|bump| *bump),
+            bump: Some(ctx.bumps.fizzbuzz),
         };
 
         init_handler(owner.clone(), fizzbuzz.clone());

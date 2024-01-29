@@ -415,7 +415,7 @@ mod calculator {
 
         let calculator = Empty {
             account: dot::program::Calculator::load(&mut ctx.accounts.calculator, &programs_map),
-            bump: ctx.bumps.get("calculator").map(|bump| *bump),
+            bump: Some(ctx.bumps.calculator),
         };
 
         init_calculator_handler(owner.clone(), calculator.clone());
