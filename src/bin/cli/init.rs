@@ -206,13 +206,16 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             cargo["dependencies"]["anchor-lang"] = anchor_version.clone();
             cargo["dependencies"]["anchor-spl"] = anchor_version;
 
+
             let mut pyth = InlineTable::new();
             pyth.insert(
                 "version",
-                Value::String(Formatted::new("0.7.1".to_string())),
+                Value::String(Formatted::new("0.10.1".to_string())),
             );
             pyth.insert("optional", Value::Boolean(Formatted::new(true)));
             cargo["dependencies"]["pyth-sdk-solana"] = Item::Value(Value::InlineTable(pyth));
+            // Add spl-associated-token-account as a dependency
+            cargo["dependencies"]["spl-associated-token-account"] = Item::Value(Value::String(Formatted::new("2.3.1".to_string())));
 
             File::create(&cargo_path)?.write_all(cargo.to_string().as_bytes())?;
 
