@@ -107,8 +107,7 @@ fn build_program(project_path: &PathBuf, program_name: String) -> Result<String,
                 let report_note = concat!(
                     "This is most likely a bug in the Seahorse compiler!\n\n",
                     "If you want to help the project, you can report this:\n",
-                    "  - on the Seahorse Discord (http://discord.gg/4sFzH5pus8)\n",
-                    "  - or as a Github issue (https://github.com/ameliatastic/seahorse-lang/issues).\n\n",
+                    "  - as a Github issue (https://github.com/solana-developers/seahorse/issues).\n\n",
                     "Thanks!"
                 ).bold();
                 return Err(error_message(format!(

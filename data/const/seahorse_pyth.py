@@ -14,7 +14,7 @@ class Price:
     """
     Pyth `Price` struct with some extra convenience functions. You can access the raw data of the struct through its fields.
 
-    "A price with a degree of uncertainty, represented as a price +- a confidence interval." (from https://docs.rs/pyth-sdk-solana/0.7.1/pyth_sdk_solana/struct.Price.html)
+    "A price with a degree of uncertainty, represented as a price +- a confidence interval." (from https://docs.rs/pyth-sdk-solana/0.10.1/pyth_sdk_solana/struct.Price.html)
     """
 
     price: i64
@@ -30,7 +30,7 @@ class PriceFeed:
     """
     Pyth `PriceFeed` struct with some extra convience functions.
 
-    "Represents a current aggregation price from pyth publisher feeds." (from https://docs.rs/pyth-sdk-solana/0.7.1/pyth_sdk_solana/struct.PriceFeed.html)
+    "Represents a current aggregation price from pyth publisher feeds." (from https://docs.rs/pyth-sdk-solana/0.10.1/pyth_sdk_solana/struct.PriceFeed.html)
     """
 
     def get_price(self) -> Price:

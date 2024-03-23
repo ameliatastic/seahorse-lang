@@ -1,5 +1,8 @@
 # seahorse: Write Solana programs in Python
 
+> [!IMPORTANT]
+> This is a fork of [seahorse-lang](https://github.com/ameliatastic/seahorse-lang). The original repository is deprecated and is broken with latest anchor updates, and is no longer maintained by its creator. If you're using `seahorse-lang` in your project, we would highly recommend migrating to `seahorse-dev`.
+
 ## The ease of Python with the safety of Rust.
 
 Seahorse lets you write Solana programs in Python. It is a community-led project built on [Anchor](https://github.com/coral-xyz/anchor).
@@ -16,11 +19,11 @@ The Seahorse compiler generates intermediate Rust artifacts and uses Anchor to d
 
 _Seahorse is beta software. Many features are unimplemented and it's not production-ready._
 
-[**Get started**](https://seahorse-lang.org/)
+[**Get started**](https://www.seahorse.dev/)
 
-[**Installation**](https://seahorse-lang.org/docs/installation)
+[**Installation**](https://www.seahorse.dev/introduction/installation)
 
-[**Examples**](/examples/)
+[**Examples**](https://github.com/solana-developers/seahorse/tree/main/examples)
 
 ## Example: FizzBuzz
 
@@ -55,9 +58,9 @@ def do_fizzbuzz(fizzbuzz: FizzBuzz, n: u64):
     fizzbuzz.n = 0
 ```
 
-This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://seahorse-lang.org/docs/your-first-seahorse-program) or other examples [here](/examples/).
+This shows some basic Seahorse functionality, like account initialization and creating instructions. For more, check out [Calculator: Your first Seahorse program](https://www.seahorse.dev/introduction/calculator-your-first-seahorse-program) or other examples [here](https://github.com/solana-developers/seahorse/tree/main/examples).
 
-The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](/src/core/README.md):
+The compiler architecture changed entirely in v0.2.0, here's a brief overview - more details [here](https://github.com/solana-developers/seahorse/tree/main/src/core):
 
 ```
 SEAHORSE CORE: THE COMPILER (v0.2.0)
