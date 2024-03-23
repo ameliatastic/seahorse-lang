@@ -206,6 +206,11 @@ pub fn init(args: InitArgs) -> Result<(), Box<dyn Error>> {
             cargo["dependencies"]["anchor-lang"] = anchor_version.clone();
             cargo["dependencies"]["anchor-spl"] = anchor_version;
 
+            // TODO: Remove once https://github.com/solana-labs/solana/issues/33504 is resolved.
+            // See https://github.com/coral-xyz/anchor/pull/2756/files
+            // Can also remove here when Anchor release that fix
+            cargo["dependencies"]["ahash"] =
+                Item::Value(Value::String(Formatted::new("=0.8.6".to_string())));
 
             let mut pyth = InlineTable::new();
             pyth.insert(

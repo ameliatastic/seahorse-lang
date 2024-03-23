@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug that prevented lists from being used in events
 - Bug that prevented users from importing accounts from other files
 - Conditionally generate Pyth import (#93)
+- Upgrade to Pyth 0.8.0 to fix dependencies
+- Compatibility with `anchor-lang 0.29.0`
 
 ## [0.2.7]
 

@@ -3,8 +3,6 @@ from seahorse.prelude import *
 declare_id('4SEMJzX6o2YQNws7yrsfUdjJCR4B5Z3GyR2Pj7UgzDy2')
 
 # This test case checks that we can use account attributes/functions in both seed and non-seed contexts
-# See https://github.com/ameliatastic/seahorse-lang/issues/62 for the original issue
-
 
 class User(Account):
     data: u8

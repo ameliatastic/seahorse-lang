@@ -13,9 +13,6 @@ class HelloEvent(Event):
     data: u8
     title: str
     owner: Pubkey
-    # Not yet supported: https://github.com/ameliatastic/seahorse-lang/issues/64
-    # items: List[u8]
-    # pair: Array[u8, 2]
 
 
 @instruction

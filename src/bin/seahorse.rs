@@ -1,6 +1,6 @@
 mod cli;
 
-pub use seahorse_lang::{core, data};
+pub use seahorse_dev::{core, data};
 
 fn main() {
     cli::run();

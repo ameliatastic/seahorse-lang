@@ -350,7 +350,7 @@ mod account_key {
         let user = dot::program::User::load(&mut ctx.accounts.user, &programs_map);
         let another = Empty {
             account: dot::program::Another::load(&mut ctx.accounts.another, &programs_map),
-            bump: ctx.bumps.get("another").map(|bump| *bump),
+            bump: Some(ctx.bumps.another),
         };
 
         ix_handler(payer.clone(), user.clone(), another.clone());
